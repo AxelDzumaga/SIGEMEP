@@ -5,6 +5,18 @@ from typing import Any
 from services.db import get_db
 
 
+_TABLAS_FTS = {
+    "memorandos": "memorandos_fts",
+    "reservados": "reservados_fts",
+}
+
+
+def _validar_tabla(tabla: str) -> str:
+    if tabla not in _TABLAS_FTS:
+        raise ValueError(f"Tabla de búsqueda no permitida: {tabla}")
+    return tabla
+
+
 def _preparar_query_fts(texto: str) -> str:
     """Elimina caracteres especiales de FTS5 y devuelve query limpia."""
     texto = re.sub(r'["()*^]', ' ', texto)
@@ -30,8 +42,10 @@ def _buscar_solo_filtros(
     paginas_min: int,
     paginas_max: int,
     limit: int,
+    tabla: str = "memorandos",
 ) -> list[dict[str, Any]]:
-    """Devuelve memorandos por fecha/páginas sin texto de búsqueda."""
+    """Devuelve registros por fecha/páginas sin texto de búsqueda."""
+    tabla = _validar_tabla(tabla)
     conditions = ["activo = 1"]
     params: list[Any] = []
     if fecha_desde:
@@ -48,7 +62,7 @@ def _buscar_solo_filtros(
         params.append(paginas_max)
     with get_db() as conn:
         rows = conn.execute(
-            f"SELECT * FROM memorandos WHERE {' AND '.join(conditions)} ORDER BY fecha_indexado DESC LIMIT ?",
+            f"SELECT * FROM {tabla} WHERE {' AND '.join(conditions)} ORDER BY fecha_indexado DESC LIMIT ?",
             params + [limit],
         ).fetchall()
     return [dict(r) for r in rows]
@@ -62,11 +76,14 @@ def buscar_memorandos(
     fecha_hasta: str = "",
     paginas_min: int = 0,
     paginas_max: int = 0,
+    tabla: str = "memorandos",
 ) -> list[dict[str, Any]]:
+    tabla = _validar_tabla(tabla)
+    tabla_fts = _TABLAS_FTS[tabla]
     q = query.strip()
     if not q:
         if fecha_desde or fecha_hasta or paginas_min or paginas_max:
-            return _buscar_solo_filtros(fecha_desde, fecha_hasta, paginas_min, paginas_max, limit)
+            return _buscar_solo_filtros(fecha_desde, fecha_hasta, paginas_min, paginas_max, limit, tabla=tabla)
         return []
 
     fts_q = _preparar_query_fts(q)
@@ -81,7 +98,7 @@ def buscar_memorandos(
     with get_db() as conn:
         try:
             fts_rows = conn.execute(
-                "SELECT rowid FROM memorandos_fts WHERE memorandos_fts MATCH ? ORDER BY rank LIMIT 5000",
+                f"SELECT rowid FROM {tabla_fts} WHERE {tabla_fts} MATCH ? ORDER BY rank LIMIT 5000",
                 (fts_q,),
             ).fetchall()
 
@@ -108,7 +125,7 @@ def buscar_memorandos(
                 params.append(paginas_max)
 
             mem_rows = conn.execute(
-                f"SELECT * FROM memorandos WHERE {' AND '.join(conditions)}",
+                f"SELECT * FROM {tabla} WHERE {' AND '.join(conditions)}",
                 params,
             ).fetchall()
 
@@ -122,15 +139,16 @@ def buscar_memorandos(
             return resultados[:limit]
 
         except Exception:
-            return _buscar_fallback(q, limit)
+            return _buscar_fallback(q, limit, tabla=tabla)
 
 
-def _buscar_fallback(query: str, limit: int) -> list[dict[str, Any]]:
+def _buscar_fallback(query: str, limit: int, tabla: str = "memorandos") -> list[dict[str, Any]]:
     """Búsqueda en Python si FTS5 no está disponible."""
+    tabla = _validar_tabla(tabla)
     q_lower = query.lower()
     tokens = query.split()
     with get_db() as conn:
-        rows = conn.execute("SELECT * FROM memorandos WHERE activo = 1").fetchall()
+        rows = conn.execute(f"SELECT * FROM {tabla} WHERE activo = 1").fetchall()
     resultados = []
     for row in rows:
         d = dict(row)

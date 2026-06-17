@@ -7,3 +7,5 @@ previews/
 primeras_hojas/
 screenshots/
 *.log
+.claude/settings.local.json
+*.bak_*

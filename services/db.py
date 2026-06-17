@@ -5,7 +5,7 @@ from pathlib import Path
 
 from passlib.context import CryptContext
 
-from config import DATABASE_PATH, DEFAULT_PDF_DIR, LOGS_DIR, PREVIEWS_DIR
+from config import DATABASE_PATH, DEFAULT_PDF_DIR, DEFAULT_RESERVADOS_DIR, LOGS_DIR, PREVIEWS_DIR
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -56,9 +56,11 @@ def set_config(conn, clave: str, valor: str) -> None:
     )
 
 
-def rebuild_fts(conn) -> None:
-    """Reconstruye el índice FTS5 desde la tabla memorandos."""
-    conn.execute("INSERT INTO memorandos_fts(memorandos_fts) VALUES('rebuild')")
+def rebuild_fts(conn, tabla_fts: str = "memorandos_fts") -> None:
+    """Reconstruye el índice FTS5 indicado (memorandos_fts o reservados_fts)."""
+    if tabla_fts not in ("memorandos_fts", "reservados_fts"):
+        raise ValueError(f"tabla_fts no permitida: {tabla_fts}")
+    conn.execute(f"INSERT INTO {tabla_fts}({tabla_fts}) VALUES('rebuild')")
 
 
 def init_db() -> None:
@@ -93,6 +95,19 @@ def init_db() -> None:
                 primera_hoja_img TEXT,
                 fecha_indexado DATETIME DEFAULT CURRENT_TIMESTAMP,
                 activo INTEGER DEFAULT 1
+            );
+
+            CREATE TABLE IF NOT EXISTS reservados (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre_archivo TEXT NOT NULL,
+                ruta_archivo TEXT NOT NULL UNIQUE,
+                texto_extraido TEXT,
+                cantidad_paginas INTEGER,
+                primera_hoja_img TEXT,
+                fecha_indexado DATETIME DEFAULT CURRENT_TIMESTAMP,
+                activo INTEGER DEFAULT 1,
+                tamanio_bytes INTEGER,
+                mtime INTEGER
             );
 
             CREATE TABLE IF NOT EXISTS auditoria (
@@ -133,6 +148,8 @@ def init_db() -> None:
         _add_column_if_missing(conn, "memorandos", "existe_en_disco", "INTEGER DEFAULT 1")
         _add_column_if_missing(conn, "memorandos", "ultima_revision", "DATETIME")
 
+        _add_column_if_missing(conn, "usuarios", "permiso_reservados", "INTEGER NOT NULL DEFAULT 0")
+
         # Índice FTS5 para búsqueda de texto completo.
         conn.execute(
             """
@@ -150,8 +167,26 @@ def init_db() -> None:
             conn.execute("INSERT INTO memorandos_fts(memorandos_fts) VALUES('rebuild')")
             set_config(conn, "fts5_inicializado", "1")
 
+        conn.execute(
+            """
+            CREATE VIRTUAL TABLE IF NOT EXISTS reservados_fts USING fts5(
+                nombre_archivo,
+                texto_extraido,
+                content='reservados',
+                content_rowid='id',
+                tokenize='unicode61 remove_diacritics 2'
+            )
+            """
+        )
+        if get_config(conn, "reservados_fts5_inicializado", "0") == "0":
+            conn.execute("INSERT INTO reservados_fts(reservados_fts) VALUES('rebuild')")
+            set_config(conn, "reservados_fts5_inicializado", "1")
+
         if not get_config(conn, "pdf_dir", ""):
             set_config(conn, "pdf_dir", DEFAULT_PDF_DIR)
+
+        if not get_config(conn, "reservados_dir", ""):
+            set_config(conn, "reservados_dir", DEFAULT_RESERVADOS_DIR)
 
         row = conn.execute("SELECT id FROM usuarios WHERE usuario = ?", ("admin",)).fetchone()
         if row is None:

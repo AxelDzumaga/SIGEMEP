@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+database.db
+logs/
+previews/
+primeras_hojas/
+screenshots/
+*.log

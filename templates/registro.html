@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Registro · SIGEMEP{% endblock %}
+{% block content %}
+<div class="auth-card auth-card-wide">
+<div class="auth-logo"><i class="fa-solid fa-user-plus"></i></div>
+<h1>Registro de usuario</h1>
+<p>Solicitá acceso como JEFE o BRIGADA. La cuenta queda pendiente hasta aprobación del ADMIN.</p>
+{% if error %}<div class="notice notice-error"><i class="fa-solid fa-triangle-exclamation"></i><span>{{ error }}</span></div>{% endif %}
+{% if ok %}<div class="notice notice-ok"><i class="fa-solid fa-circle-check"></i><span>{{ ok }}</span></div>{% endif %}
+<form method="post" action="/registro" class="auth-form">
+<div class="form-grid">
+<label><span>Nombre y apellido</span><input type="text" name="nombre_apellido" required></label>
+<label><span>DNI / Legajo</span><input type="text" name="dni_legajo" required></label>
+<label><span>Usuario</span><input type="text" name="usuario" required></label>
+<label><span>Contraseña</span><input type="password" name="password" required></label>
+<label><span>Repetir contraseña</span><input type="password" name="password2" required></label>
+</div>
+<div class="role-cards">
+<label class="role-card"><input type="radio" name="tipo_registro" value="JEFE" required><div><i class="fa-solid fa-user-tie"></i><strong>Registro JEFE</strong><span>Busca, ve primera hoja y puede ver PDF completo. Cupo: 4.</span></div></label>
+<label class="role-card"><input type="radio" name="tipo_registro" value="BRIGADA" required><div><i class="fa-solid fa-user-shield"></i><strong>Registro BRIGADA</strong><span>Busca y visualiza únicamente la primera hoja con marca de agua. Cupo: 10.</span></div></label>
+</div>
+<button type="submit" class="btn btn-primary btn-full"><i class="fa-solid fa-paper-plane"></i> Enviar solicitud</button>
+</form>
+<div class="auth-footer"><a href="/login"><i class="fa-solid fa-arrow-left"></i> Volver al login</a></div>
+</div>
+{% endblock %}

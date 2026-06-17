@@ -1,0 +1,605 @@
+{% extends "base.html" %}
+
+{% block title %}Auditoría · SIGEMEP{% endblock %}
+{% block page_title %}Auditoría del sistema{% endblock %}
+
+{% block head %}
+<style>
+    .audit-page-header {
+        background:
+            radial-gradient(circle at top right, rgba(255, 115, 0, 0.16), transparent 35%),
+            linear-gradient(145deg, rgba(18, 24, 28, 0.98), rgba(7, 10, 12, 0.99));
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        border-left: 5px solid #ff7300;
+        border-radius: 26px;
+        padding: 24px;
+        box-shadow: 0 22px 55px rgba(0, 0, 0, 0.35);
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 18px;
+        margin-bottom: 22px;
+    }
+
+    .audit-page-header h1 {
+        margin: 0;
+        color: #ffffff;
+        font-size: 36px;
+        letter-spacing: -0.8px;
+    }
+
+    .audit-page-header p {
+        margin: 8px 0 0;
+        color: #9ca3af;
+    }
+
+    .audit-chip-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #ffb36b;
+        background: rgba(255, 115, 0, 0.12);
+        border: 1px solid rgba(255, 115, 0, 0.32);
+        border-radius: 999px;
+        padding: 7px 13px;
+        font-size: 12px;
+        font-weight: 950;
+        text-transform: uppercase;
+        margin-bottom: 15px;
+    }
+
+    .audit-stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(180px, 1fr));
+        gap: 16px;
+        margin-bottom: 22px;
+    }
+
+    .audit-stat {
+        background: linear-gradient(145deg, rgba(18, 24, 28, 0.98), rgba(7, 10, 12, 0.99));
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        border-radius: 22px;
+        padding: 18px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
+    }
+
+    .audit-stat-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 17px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        background: rgba(255, 115, 0, 0.14);
+        color: #ff7300;
+    }
+
+    .audit-stat.green .audit-stat-icon {
+        background: rgba(34, 197, 94, 0.14);
+        color: #86efac;
+    }
+
+    .audit-stat.red .audit-stat-icon {
+        background: rgba(239, 68, 68, 0.14);
+        color: #fca5a5;
+    }
+
+    .audit-stat strong {
+        display: block;
+        color: #ffffff;
+        font-size: 24px;
+        line-height: 1;
+    }
+
+    .audit-stat span {
+        display: block;
+        margin-top: 5px;
+        color: #9ca3af;
+        font-size: 13px;
+        font-weight: 800;
+    }
+
+    .audit-panel {
+        background:
+            radial-gradient(circle at top right, rgba(255, 115, 0, 0.10), transparent 35%),
+            linear-gradient(145deg, rgba(18, 24, 28, 0.98), rgba(7, 10, 12, 0.99));
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        border-radius: 26px;
+        padding: 22px;
+        box-shadow: 0 22px 55px rgba(0, 0, 0, 0.35);
+    }
+
+    .audit-panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding-bottom: 16px;
+        margin-bottom: 16px;
+    }
+
+    .audit-panel-head h2 {
+        margin: 0;
+        color: #ffffff;
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .audit-panel-head h2 i {
+        color: #ff7300;
+    }
+
+    .audit-panel-head p {
+        margin: 6px 0 0;
+        color: #9ca3af;
+        font-size: 13px;
+    }
+
+    .audit-export-btn {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        color: #ffffff;
+        text-decoration: none;
+        border-radius: 13px;
+        padding: 10px 14px;
+        font-weight: 900;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .audit-export-btn:hover {
+        background: rgba(255, 115, 0, 0.14);
+        border-color: rgba(255, 115, 0, 0.35);
+        color: #ffb36b;
+    }
+
+    .audit-table-box {
+        overflow: auto;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 115, 0, 0.18);
+        background: rgba(5, 7, 8, 0.92);
+    }
+
+    .audit-pro-table {
+        width: 100%;
+        min-width: 1180px;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .audit-pro-table thead {
+        background: linear-gradient(145deg, #111417, #0b0f12);
+    }
+
+    .audit-pro-table th {
+        color: #ffb36b;
+        font-size: 12px;
+        font-weight: 950;
+        text-transform: uppercase;
+        letter-spacing: 0.45px;
+        padding: 14px 12px;
+        border-bottom: 1px solid rgba(255, 115, 0, 0.35);
+        border-right: 1px solid rgba(255, 255, 255, 0.06);
+        white-space: nowrap;
+        text-align: left;
+    }
+
+    .audit-pro-table td {
+        padding: 13px 12px;
+        color: #e5e7eb;
+        font-size: 13px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        border-right: 1px solid rgba(255, 255, 255, 0.045);
+        vertical-align: top;
+    }
+
+    .audit-pro-table th:last-child,
+    .audit-pro-table td:last-child {
+        border-right: none;
+    }
+
+    .audit-pro-table tbody tr:nth-child(odd) {
+        background: rgba(255, 255, 255, 0.025);
+    }
+
+    .audit-pro-table tbody tr:nth-child(even) {
+        background: rgba(255, 115, 0, 0.025);
+    }
+
+    .audit-pro-table tbody tr:hover {
+        background: rgba(255, 115, 0, 0.10);
+    }
+
+    .audit-id {
+        color: #ffb36b;
+        font-weight: 950;
+        white-space: nowrap;
+    }
+
+    .audit-date strong {
+        display: block;
+        color: #ffffff;
+        font-size: 13px;
+        white-space: nowrap;
+    }
+
+    .audit-date span {
+        display: block;
+        color: #9ca3af;
+        font-size: 12px;
+        margin-top: 3px;
+    }
+
+    .audit-user-box {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        min-width: 120px;
+    }
+
+    .audit-avatar {
+        width: 30px;
+        height: 30px;
+        border-radius: 10px;
+        background: rgba(255, 115, 0, 0.14);
+        color: #ffb36b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 950;
+        font-size: 12px;
+        flex-shrink: 0;
+    }
+
+    .audit-user-box strong {
+        color: #ffffff;
+        font-weight: 900;
+        font-size: 13px;
+    }
+
+    .audit-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-weight: 950;
+        font-size: 12px;
+        white-space: nowrap;
+        min-width: 120px;
+    }
+
+    .audit-badge.search {
+        background: rgba(59, 130, 246, 0.14);
+        color: #93c5fd;
+    }
+
+    .audit-badge.view {
+        background: rgba(255, 115, 0, 0.14);
+        color: #ffb36b;
+    }
+
+    .audit-badge.login {
+        background: rgba(34, 197, 94, 0.14);
+        color: #86efac;
+    }
+
+    .audit-badge.denied {
+        background: rgba(239, 68, 68, 0.14);
+        color: #fca5a5;
+    }
+
+    .audit-badge.user {
+        background: rgba(168, 85, 247, 0.14);
+        color: #d8b4fe;
+    }
+
+    .audit-badge.other {
+        background: rgba(255, 255, 255, 0.08);
+        color: #cbd5e1;
+    }
+
+    .audit-raw-action {
+        margin-top: 6px;
+        color: #6b7280;
+        font-size: 10px;
+        font-family: Consolas, monospace;
+        max-width: 180px;
+        word-break: break-word;
+    }
+
+    .audit-memo {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #ffffff;
+        font-weight: 900;
+        white-space: nowrap;
+    }
+
+    .audit-memo i {
+        color: #ff7300;
+    }
+
+    .audit-ip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #d1d5db;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .audit-ip i {
+        color: #ff7300;
+    }
+
+    .audit-result {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 60px;
+        padding: 5px 9px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 950;
+    }
+
+    .audit-result.ok {
+        background: rgba(34, 197, 94, 0.14);
+        color: #86efac;
+    }
+
+    .audit-result.denied {
+        background: rgba(239, 68, 68, 0.14);
+        color: #fca5a5;
+    }
+
+    .audit-result.neutral {
+        background: rgba(255, 255, 255, 0.08);
+        color: #cbd5e1;
+    }
+
+    .audit-detail-box {
+        max-width: 460px;
+        min-width: 300px;
+        background: rgba(255, 255, 255, 0.045);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-left: 3px solid rgba(255, 115, 0, 0.55);
+        border-radius: 12px;
+        padding: 9px 11px;
+        color: #d1d5db;
+        font-family: Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.45;
+        word-break: break-word;
+        white-space: normal;
+    }
+
+    .audit-muted {
+        color: #6b7280;
+    }
+
+    @media (max-width: 900px) {
+        .audit-page-header,
+        .audit-panel-head {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .audit-stats {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<section class="audit-page-header">
+    <div>
+        <span class="audit-chip-title">
+            <i class="fa-solid fa-shield-check"></i>
+            Registro de actividad
+        </span>
+
+        <h1>Auditoría</h1>
+
+        <p>
+            Ingresos, búsquedas, visualizaciones, acciones administrativas e intentos registrados.
+        </p>
+    </div>
+
+    <a href="/admin/auditoria/export.csv" class="audit-export-btn">
+        <i class="fa-solid fa-file-csv"></i>
+        Exportar CSV
+    </a>
+</section>
+
+<section class="audit-stats">
+    <article class="audit-stat">
+        <div class="audit-stat-icon">
+            <i class="fa-solid fa-list-check"></i>
+        </div>
+        <div>
+            <strong>{{ rows|length }}</strong>
+            <span>Registros mostrados</span>
+        </div>
+    </article>
+
+    <article class="audit-stat green">
+        <div class="audit-stat-icon">
+            <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <div>
+            <strong>OK</strong>
+            <span>Acciones permitidas</span>
+        </div>
+    </article>
+
+    <article class="audit-stat red">
+        <div class="audit-stat-icon">
+            <i class="fa-solid fa-ban"></i>
+        </div>
+        <div>
+            <strong>DENEGADO</strong>
+            <span>Accesos bloqueados</span>
+        </div>
+    </article>
+</section>
+
+<section class="audit-panel">
+
+    <div class="audit-panel-head">
+        <div>
+            <h2>
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                Movimientos registrados
+            </h2>
+            <p>Listado cronológico de acciones realizadas dentro del sistema.</p>
+        </div>
+    </div>
+
+    <div class="audit-table-box">
+        <table class="audit-pro-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Fecha / Hora</th>
+                    <th>Usuario</th>
+                    <th>Acción</th>
+                    <th>Memorando</th>
+                    <th>IP</th>
+                    <th>Resultado</th>
+                    <th>Detalle</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for r in rows %}
+                <tr>
+                    <td class="audit-id">
+                        #{{ r.id }}
+                    </td>
+
+                    <td>
+                        {% set partes = (r.fecha_hora or '').split(' ') %}
+                        <div class="audit-date">
+                            <strong>{{ partes[0] if partes|length > 0 else '—' }}</strong>
+                            <span>{{ partes[1] if partes|length > 1 else '' }}</span>
+                        </div>
+                    </td>
+
+                    <td>
+                        <div class="audit-user-box">
+                            <div class="audit-avatar">
+                                {{ (r.usuario_nombre or r.usuario_id or '?')|string|first|upper }}
+                            </div>
+                            <strong>{{ r.usuario_nombre or r.usuario_id or '—' }}</strong>
+                        </div>
+                    </td>
+
+                    <td>
+                        {% if r.accion == 'LOGIN_EXITOSO' %}
+                            <span class="audit-badge login">
+                                <i class="fa-solid fa-right-to-bracket"></i>
+                                Login
+                            </span>
+                        {% elif r.accion == 'BUSQUEDA_REALIZADA' %}
+                            <span class="audit-badge search">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                Búsqueda
+                            </span>
+                        {% elif r.accion == 'PRIMERA_HOJA_VISUALIZADA' %}
+                            <span class="audit-badge view">
+                                <i class="fa-solid fa-eye"></i>
+                                Primera hoja
+                            </span>
+                        {% elif r.accion == 'PDF_COMPLETO_VISUALIZADO' %}
+                            <span class="audit-badge view">
+                                <i class="fa-solid fa-file-pdf"></i>
+                                PDF completo
+                            </span>
+                        {% elif 'DENEGADO' in r.accion or 'DENEGADA' in r.accion %}
+                            <span class="audit-badge denied">
+                                <i class="fa-solid fa-ban"></i>
+                                Denegado
+                            </span>
+                        {% elif 'USUARIO' in r.accion %}
+                            <span class="audit-badge user">
+                                <i class="fa-solid fa-user-gear"></i>
+                                Usuario
+                            </span>
+                        {% else %}
+                            <span class="audit-badge other">
+                                <i class="fa-solid fa-circle-info"></i>
+                                Acción
+                            </span>
+                        {% endif %}
+
+                        <div class="audit-raw-action">
+                            {{ r.accion or '—' }}
+                        </div>
+                    </td>
+
+                    <td>
+                        {% if r.memorando_id %}
+                            <span class="audit-memo">
+                                <i class="fa-solid fa-file-lines"></i>
+                                {{ r.memorando_id }}
+                            </span>
+                        {% else %}
+                            <span class="audit-muted">—</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <span class="audit-ip">
+                            <i class="fa-solid fa-network-wired"></i>
+                            {{ r.ip or '—' }}
+                        </span>
+                    </td>
+
+                    <td>
+                        {% if r.resultado == 'OK' %}
+                            <span class="audit-result ok">OK</span>
+                        {% elif r.resultado == 'DENEGADO' %}
+                            <span class="audit-result denied">DENEGADO</span>
+                        {% else %}
+                            <span class="audit-result neutral">{{ r.resultado or '—' }}</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <div class="audit-detail-box">
+                            {{ r.detalle or '—' }}
+                        </div>
+                    </td>
+                </tr>
+
+                {% else %}
+                <tr>
+                    <td colspan="8">
+                        <div class="empty-box">
+                            <i class="fa-solid fa-inbox"></i>
+                            <p>Sin registros de auditoría.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</section>
+
+{% endblock %}

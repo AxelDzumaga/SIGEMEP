@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Memorandos - SIGEMEP{% endblock %}
+{% block page_title %}Memorandos indexados{% endblock %}
+
+{% block content %}
+
+<section class="results-header">
+    <div>
+        <span class="section-tag">
+            <i class="fa-solid fa-database"></i>
+            Base PDF
+        </span>
+        <h1>Memorandos indexados</h1>
+        <p>Listado administrativo de PDFs detectados en la carpeta configurada.</p>
+    </div>
+
+    <a class="btn btn-primary" href="/admin/reindexar">
+        <i class="fa-solid fa-rotate"></i>
+        Actualizar base PDF
+    </a>
+</section>
+
+<section class="glass-card">
+    <div class="dark-table-wrap">
+        <table class="dark-table">
+            <thead>
+                <tr>
+                    <th>Preview</th>
+                    <th>Archivo</th>
+                    <th>Páginas</th>
+                    <th>Activo</th>
+                    <th>Tamaño</th>
+                    <th>Última revisión</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in memorandos %}
+                <tr>
+                    <td>
+                        <img class="preview-thumb" style="width:60px;height:82px;object-fit:cover;border-radius:10px" src="/preview/{{ m.id }}" onerror="this.style.display='none'">
+                    </td>
+                    <td>
+                        <strong>{{ m.nombre_archivo }}</strong>
+                        <div class="muted-text font-monospace">{{ m.ruta_archivo }}</div>
+                    </td>
+                    <td>{{ m.cantidad_paginas or '—' }}</td>
+                    <td>
+                        {% if m.activo %}
+                            <span class="pill orange">Sí</span>
+                        {% else %}
+                            <span class="pill amber">No</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ m.tamano_archivo or '—' }}</td>
+                    <td>{{ m.ultima_revision or '—' }}</td>
+                    <td>
+                        <div class="memo-actions">
+                            <a class="btn btn-outline" href="/ver_primera_hoja/{{ m.id }}">
+                                <i class="fa-solid fa-eye"></i>
+                                Primera hoja
+                            </a>
+                            <a class="btn btn-primary" href="/ver_pdf_completo/{{ m.id }}">
+                                <i class="fa-solid fa-file-pdf"></i>
+                                PDF completo
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7">
+                        <div class="empty-box">
+                            <i class="fa-solid fa-inbox"></i>
+                            <p>No hay memorandos indexados. Use Indexar PDF.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{% endblock %}

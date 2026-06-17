@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+
+{% block title %}Panel ADMIN - SIGEMEP{% endblock %}
+{% block page_title %}Panel administrador{% endblock %}
+{% block head %}
+<style>
+    /* Oculta la barra superior solo en el dashboard ADMIN */
+    .topbar {
+        display: none !important;
+    }
+
+    /* Ajusta el espacio superior al sacar la barra */
+    .main {
+        padding-top: 18px !important;
+    }
+
+    /* El hero principal queda como encabezado real */
+    .hero-panel {
+        margin-top: 0 !important;
+    }
+</style>
+{% endblock %}
+{% block content %}
+
+<section class="hero-panel">
+    <div>
+        <span class="section-tag">
+            <i class="fa-solid fa-shield-halved"></i>
+            Dashboard ADMIN
+        </span>
+
+        <h1>Panel administrador</h1>
+        <p>
+            Control total de usuarios, memorandos, auditoría, ingresos, movimientos e indexación.
+        </p>
+
+        <div class="hero-actions">
+            <a href="/admin/reindexar" class="btn btn-primary">
+                <i class="fa-solid fa-file-arrow-up"></i>
+                Indexar PDFs
+            </a>
+
+            <a href="/buscar" class="btn btn-dark">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                Buscar memorandos
+            </a>
+
+            <a href="/admin/auditoria" class="btn btn-outline">
+                <i class="fa-solid fa-shield-check"></i>
+                Ver auditoría
+            </a>
+        </div>
+    </div>
+
+
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <div class="stat-icon orange">
+            <i class="fa-solid fa-file-lines"></i>
+        </div>
+        <div>
+            <strong>{{ total_memorandos | default(n_memorandos | default(0)) }}</strong>
+            <span>Memorandos</span>
+            <small>Total en el sistema</small>
+        </div>
+    </article>
+
+    <article class="stat-card">
+        <div class="stat-icon dark">
+            <i class="fa-solid fa-users"></i>
+        </div>
+        <div>
+            <strong>{{ usuarios_activos | default(n_activos | default(0)) }}</strong>
+            <span>Usuarios activos</span>
+            <small>Sesiones habilitadas</small>
+        </div>
+    </article>
+
+    <article class="stat-card">
+        <div class="stat-icon amber">
+            <i class="fa-solid fa-user-clock"></i>
+        </div>
+        <div>
+            <strong>{{ usuarios_pendientes | default(n_pendientes | default(0)) }}</strong>
+            <span>Pendientes</span>
+            <small>Usuarios por aprobar</small>
+        </div>
+    </article>
+
+    <article class="stat-card">
+        <div class="stat-icon red">
+            <i class="fa-solid fa-ban"></i>
+        </div>
+        <div>
+            <strong>{{ intentos_denegados | default(n_denegados | default(0)) }}</strong>
+            <span>Intentos denegados</span>
+            <small>Accesos bloqueados</small>
+        </div>
+    </article>
+</section>
+
+<section class="dashboard-grid">
+
+    <article class="glass-card">
+        <div class="card-head">
+            <div>
+                <h2>
+                    <i class="fa-solid fa-bolt"></i>
+                    Accesos rápidos
+                </h2>
+                <p>Operaciones principales</p>
+            </div>
+        </div>
+
+        <div class="quick-list">
+            <a href="/admin/usuarios" class="quick-item">
+                <i class="fa-solid fa-users-gear"></i>
+                <div>
+                    <strong>Gestionar usuarios</strong>
+                    <span>Aprobar, bloquear, eliminar, activar y resetear claves</span>
+                </div>
+                <i class="fa-solid fa-chevron-right arrow"></i>
+            </a>
+
+            <a href="/admin/ingresos" class="quick-item">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <div>
+                    <strong>Ingresos y horarios</strong>
+                    <span>Fecha, hora, IP y actividad por usuario</span>
+                </div>
+                <i class="fa-solid fa-chevron-right arrow"></i>
+            </a>
+
+            <a href="/admin/reindexar" class="quick-item">
+                <i class="fa-solid fa-file-pdf"></i>
+                <div>
+                    <strong>Actualizar base PDF</strong>
+                    <span>Indexación rápida o reindexación completa</span>
+                </div>
+                <i class="fa-solid fa-chevron-right arrow"></i>
+            </a>
+
+            <a href="/admin/auditoria" class="quick-item">
+                <i class="fa-solid fa-shield"></i>
+                <div>
+                    <strong>Auditoría completa</strong>
+                    <span>Búsquedas, vistas, PDF completo e intentos denegados</span>
+                </div>
+                <i class="fa-solid fa-chevron-right arrow"></i>
+            </a>
+        </div>
+    </article>
+
+    <article class="glass-card admin-activity-card">
+        <div class="card-head">
+            <div>
+                <h2>
+                    <i class="fa-solid fa-list-check"></i>
+                    Últimos movimientos registrados
+                </h2>
+                <p>Actividad reciente del sistema</p>
+            </div>
+
+            <a href="/admin/auditoria" class="small-btn">
+                Ver todo
+            </a>
+        </div>
+
+        {% set movimientos = ultimos_movimientos | default(ult_mov | default([])) %}
+
+        {% if movimientos %}
+        <div class="admin-timeline">
+
+            {% for mov in movimientos[:8] %}
+
+            <div class="admin-timeline-item">
+
+                <div class="admin-timeline-icon
+                    {% if mov.accion == 'LOGIN_EXITOSO' %}
+                        icon-ok
+                    {% elif mov.accion == 'BUSQUEDA_REALIZADA' %}
+                        icon-search
+                    {% elif mov.accion == 'PRIMERA_HOJA_VISUALIZADA' %}
+                        icon-view
+                    {% elif mov.accion == 'PDF_COMPLETO_VISUALIZADO' %}
+                        icon-pdf
+                    {% elif 'DENEGADO' in mov.accion or 'DENEGADA' in mov.accion %}
+                        icon-denied
+                    {% elif 'USUARIO' in mov.accion %}
+                        icon-user
+                    {% else %}
+                        icon-info
+                    {% endif %}
+                ">
+                    {% if mov.accion == 'LOGIN_EXITOSO' %}
+                        <i class="fa-solid fa-right-to-bracket"></i>
+                    {% elif mov.accion == 'BUSQUEDA_REALIZADA' %}
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    {% elif mov.accion == 'PRIMERA_HOJA_VISUALIZADA' %}
+                        <i class="fa-solid fa-eye"></i>
+                    {% elif mov.accion == 'PDF_COMPLETO_VISUALIZADO' %}
+                        <i class="fa-solid fa-file-pdf"></i>
+                    {% elif 'DENEGADO' in mov.accion or 'DENEGADA' in mov.accion %}
+                        <i class="fa-solid fa-ban"></i>
+                    {% elif 'USUARIO' in mov.accion %}
+                        <i class="fa-solid fa-user-gear"></i>
+                    {% else %}
+                        <i class="fa-solid fa-circle-info"></i>
+                    {% endif %}
+                </div>
+
+                <div class="admin-timeline-body">
+                    <div class="admin-timeline-top">
+                        <div>
+                            <strong>
+                                {% if mov.accion == 'LOGIN_EXITOSO' %}
+                                    Inicio de sesión
+                                {% elif mov.accion == 'BUSQUEDA_REALIZADA' %}
+                                    Búsqueda realizada
+                                {% elif mov.accion == 'PRIMERA_HOJA_VISUALIZADA' %}
+                                    Primera hoja visualizada
+                                {% elif mov.accion == 'PDF_COMPLETO_VISUALIZADO' %}
+                                    PDF completo visualizado
+                                {% elif 'DENEGADO' in mov.accion or 'DENEGADA' in mov.accion %}
+                                    Acceso denegado
+                                {% elif mov.accion == 'USUARIO_ELIMINADO' %}
+                                    Usuario eliminado
+                                {% elif 'USUARIO' in mov.accion %}
+                                    Gestión de usuario
+                                {% else %}
+                                    {{ mov.accion }}
+                                {% endif %}
+                            </strong>
+
+                            <span>
+                                {{ mov.u_nom or mov.usuario_nombre or mov.usuario_id or 'Sistema' }}
+                            </span>
+                        </div>
+
+                        <div class="admin-timeline-date">
+                            {% set partes = (mov.fecha_hora or '').split(' ') %}
+                            <strong>{{ partes[1] if partes|length > 1 else '' }}</strong>
+                            <span>{{ partes[0] if partes|length > 0 else mov.fecha_hora }}</span>
+                        </div>
+                    </div>
+
+                    <div class="admin-timeline-detail">
+                        {{ mov.detalle or 'Sin detalle registrado' }}
+                    </div>
+
+                    <div class="admin-timeline-raw">
+                        {{ mov.accion }}
+                    </div>
+                </div>
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+        {% else %}
+        <div class="empty-box">
+            <i class="fa-solid fa-inbox"></i>
+            <p>No hay movimientos recientes.</p>
+        </div>
+        {% endif %}
+    </article>
+
+</section>
+
+<section class="glass-card">
+    <div class="card-head">
+        <div>
+            <h2>
+                <i class="fa-solid fa-user-clock"></i>
+                Solicitudes pendientes
+            </h2>
+            <p>Usuarios que esperan aprobación del administrador</p>
+        </div>
+
+        <a href="/admin/usuarios" class="small-btn">
+            Gestionar
+        </a>
+    </div>
+
+    {% if usuarios_pendientes_lista %}
+    <div class="dark-table-wrap">
+        <table class="dark-table">
+            <thead>
+                <tr>
+                    <th>Usuario</th>
+                    <th>Nombre</th>
+                    <th>DNI / Legajo</th>
+                    <th>Rol solicitado</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in usuarios_pendientes_lista %}
+                <tr>
+                    <td>{{ u.usuario }}</td>
+                    <td>{{ u.nombre_apellido }}</td>
+                    <td>{{ u.dni_legajo or '-' }}</td>
+                    <td><span class="pill orange">{{ u.rol }}</span></td>
+                    <td><span class="pill amber">{{ u.estado }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-box horizontal">
+        <i class="fa-solid fa-circle-check"></i>
+        <p>No hay usuarios pendientes de aprobación.</p>
+    </div>
+    {% endif %}
+</section>
+
+{% endblock %}

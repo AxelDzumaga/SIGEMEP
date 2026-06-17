@@ -1,0 +1,915 @@
+{% extends "base.html" %}
+
+{% block title %}Centro de supervisión · SIGEMEP{% endblock %}
+{% block page_title %}Centro de supervisión{% endblock %}
+
+{% block head %}
+<style>
+/* Dashboard JEFE - Estilo centro de mando */
+.jefe-cmd {
+    position: relative;
+    display: grid;
+    gap: 18px;
+    min-height: calc(100vh - 40px);
+    overflow: hidden;
+}
+
+.jefe-cmd::before {
+    content: "DIVISIÓN\A SEGUIMIENTO\A DE LAS CONDUCTAS\A POLICIALES";
+    white-space: pre-line;
+    position: absolute;
+    right: -20px;
+    top: 20px;
+    z-index: 0;
+    color: rgba(255, 255, 255, .035);
+    font-size: clamp(48px, 7vw, 118px);
+    line-height: .88;
+    font-weight: 950;
+    letter-spacing: 5px;
+    text-align: right;
+    text-transform: uppercase;
+    pointer-events: none;
+}
+
+.jefe-cmd::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background:
+        radial-gradient(circle at 86% 10%, rgba(255, 115, 0, .16), transparent 28%),
+        radial-gradient(circle at 18% 80%, rgba(255, 115, 0, .08), transparent 26%),
+        linear-gradient(120deg, transparent 0 30%, rgba(255, 115, 0, .025) 30% 31%, transparent 31% 100%);
+    pointer-events: none;
+}
+
+.jefe-cmd > * {
+    position: relative;
+    z-index: 1;
+}
+
+.jefe-top {
+    display: grid;
+    grid-template-columns: 1fr 330px;
+    gap: 16px;
+    align-items: stretch;
+}
+
+.jefe-hero {
+    position: relative;
+    overflow: hidden;
+    border-radius: 30px;
+    min-height: 210px;
+    padding: 28px 30px;
+    background:
+        radial-gradient(circle at 18% 18%, rgba(255, 115, 0, .13), transparent 31%),
+        radial-gradient(circle at 92% 10%, rgba(255, 115, 0, .18), transparent 30%),
+        linear-gradient(145deg, rgba(17, 23, 27, .97), rgba(5, 7, 9, .99));
+    border: 1px solid rgba(255, 255, 255, .10);
+    border-left: 5px solid var(--orange, #ff7300);
+    box-shadow: 0 28px 75px rgba(0, 0, 0, .48);
+}
+
+.jefe-hero::before {
+    content: "";
+    position: absolute;
+    right: -80px;
+    top: -80px;
+    width: 450px;
+    height: 280px;
+    background: repeating-linear-gradient(
+        -18deg,
+        rgba(255, 115, 0, .16) 0,
+        rgba(255, 115, 0, .16) 1px,
+        transparent 1px,
+        transparent 11px
+    );
+    opacity: .42;
+    transform: rotate(-8deg);
+    pointer-events: none;
+}
+
+.jefe-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+    padding: 8px 13px;
+    border-radius: 999px;
+    color: #ffb36b;
+    background: rgba(255, 115, 0, .11);
+    border: 1px solid rgba(255, 115, 0, .34);
+    font-size: 12px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: .45px;
+}
+
+.jefe-hero h1 {
+    margin: 20px 0 0;
+    color: #ffffff;
+    font-size: clamp(36px, 5vw, 62px);
+    line-height: .98;
+    font-weight: 950;
+    letter-spacing: -1.8px;
+}
+
+.jefe-hero h1 span {
+    color: var(--orange, #ff7300);
+    text-shadow: 0 0 30px rgba(255, 115, 0, .24);
+}
+
+.jefe-hero p {
+    max-width: 840px;
+    margin: 14px 0 0;
+    color: #b6beca;
+    font-size: 14px;
+    line-height: 1.58;
+}
+
+.jefe-hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 20px;
+    color: #aeb7c4;
+    font-size: 12px;
+}
+
+.jefe-hero-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.jefe-hero-meta i {
+    color: var(--orange, #ff7300);
+}
+
+.jefe-profile {
+    border-radius: 28px;
+    padding: 22px;
+    background:
+        radial-gradient(circle at top right, rgba(255, 115, 0, .20), transparent 42%),
+        linear-gradient(145deg, rgba(28, 15, 5, .78), rgba(8, 10, 12, .97));
+    border: 1px solid rgba(255, 115, 0, .35);
+    box-shadow:
+        0 25px 60px rgba(0, 0, 0, .44),
+        inset 0 0 28px rgba(255, 115, 0, .035);
+    display: grid;
+    align-content: center;
+}
+
+.jefe-profile-main {
+    display: grid;
+    grid-template-columns: 74px 1fr;
+    gap: 14px;
+    align-items: center;
+}
+
+.jefe-profile-badge {
+    width: 74px;
+    height: 74px;
+    border-radius: 24px;
+    background: linear-gradient(145deg, #ff8a00, #ff7300);
+    color: #111;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    box-shadow: 0 0 34px rgba(255, 115, 0, .22);
+}
+
+.jefe-profile strong {
+    display: block;
+    color: #fff;
+    font-size: 17px;
+    font-weight: 950;
+    overflow-wrap: anywhere;
+}
+
+.jefe-profile small {
+    display: inline-flex;
+    margin-top: 7px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(255, 115, 0, .14);
+    border: 1px solid rgba(255, 115, 0, .26);
+    color: #ffb36b;
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: .5px;
+}
+
+.jefe-profile p {
+    margin: 15px 0 0;
+    color: #aeb7c4;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.jefe-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(170px, 1fr));
+    gap: 14px;
+}
+
+.jefe-kpi {
+    min-height: 112px;
+    border-radius: 24px;
+    padding: 16px;
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 14px;
+    align-items: center;
+    background:
+        radial-gradient(circle at top right, rgba(255, 115, 0, .09), transparent 38%),
+        linear-gradient(145deg, rgba(18, 24, 28, .96), rgba(7, 10, 12, .99));
+    border: 1px solid rgba(255, 255, 255, .10);
+    box-shadow: 0 18px 45px rgba(0, 0, 0, .32);
+}
+
+.jefe-kpi-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 19px;
+    background: rgba(255, 115, 0, .14);
+    color: var(--orange, #ff7300);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.jefe-kpi strong {
+    display: block;
+    color: #fff;
+    font-size: 25px;
+    font-weight: 950;
+    line-height: 1;
+}
+
+.jefe-kpi span {
+    display: block;
+    margin-top: 6px;
+    color: #9ca3af;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.jefe-kpi em {
+    display: inline-flex;
+    margin-top: 6px;
+    color: #7ddf64;
+    font-style: normal;
+    font-size: 11px;
+    font-weight: 950;
+}
+
+.jefe-main-grid {
+    display: grid;
+    grid-template-columns: 1.08fr .92fr;
+    gap: 16px;
+}
+
+.jefe-panel {
+    border-radius: 26px;
+    padding: 20px;
+    background:
+        radial-gradient(circle at top right, rgba(255, 115, 0, .08), transparent 36%),
+        linear-gradient(145deg, rgba(18, 24, 28, .96), rgba(7, 10, 12, .99));
+    border: 1px solid rgba(255, 255, 255, .10);
+    box-shadow: 0 22px 55px rgba(0, 0, 0, .34);
+}
+
+.jefe-panel-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.jefe-panel h2 {
+    margin: 0;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 950;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.jefe-panel h2 i {
+    color: var(--orange, #ff7300);
+}
+
+.jefe-panel p {
+    margin: 7px 0 0;
+    color: #9ca3af;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.jefe-link-lite {
+    min-height: 34px;
+    padding: 8px 11px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, .10);
+    background: rgba(255, 255, 255, .045);
+    color: #ffb36b !important;
+    text-decoration: none !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 950;
+    white-space: nowrap;
+}
+
+.jefe-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    gap: 12px;
+}
+
+.jefe-action {
+    min-height: 138px;
+    border-radius: 20px;
+    padding: 16px 13px;
+    background: rgba(255, 255, 255, .045);
+    border: 1px solid rgba(255, 255, 255, .08);
+    color: #fff !important;
+    text-decoration: none !important;
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    text-align: center;
+    gap: 10px;
+    transition: transform .16s ease, border-color .16s ease, background .16s ease;
+}
+
+.jefe-action:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 115, 0, .10);
+    border-color: rgba(255, 115, 0, .30);
+}
+
+.jefe-action i {
+    width: 54px;
+    height: 54px;
+    border-radius: 18px;
+    background: rgba(255, 115, 0, .14);
+    color: var(--orange, #ff7300);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.jefe-action strong {
+    color: #fff;
+    font-size: 13px;
+    font-weight: 950;
+}
+
+.jefe-action span {
+    color: #9ca3af;
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.jefe-control-list {
+    display: grid;
+    gap: 10px;
+}
+
+.jefe-control {
+    min-height: 63px;
+    border-radius: 17px;
+    padding: 12px;
+    background: rgba(255, 255, 255, .042);
+    border: 1px solid rgba(255, 255, 255, .075);
+    display: grid;
+    grid-template-columns: 38px 1fr auto;
+    gap: 11px;
+    align-items: center;
+}
+
+.jefe-control i {
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    background: rgba(125, 223, 100, .12);
+    color: #7ddf64;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.jefe-control strong {
+    display: block;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 950;
+}
+
+.jefe-control span {
+    display: block;
+    margin-top: 3px;
+    color: #9ca3af;
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.jefe-control em {
+    color: #7ddf64;
+    font-style: normal;
+    font-size: 11px;
+    font-weight: 950;
+}
+
+.jefe-bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr .95fr;
+    gap: 16px;
+}
+
+.jefe-timeline {
+    display: grid;
+    gap: 9px;
+}
+
+.jefe-timeline-item {
+    min-height: 70px;
+    border-radius: 18px;
+    padding: 12px;
+    background: rgba(255, 255, 255, .042);
+    border: 1px solid rgba(255, 255, 255, .075);
+    color: #fff !important;
+    text-decoration: none !important;
+    display: grid;
+    grid-template-columns: 44px 1fr auto;
+    gap: 12px;
+    align-items: center;
+}
+
+.jefe-timeline-item:hover {
+    background: rgba(255, 115, 0, .095);
+    border-color: rgba(255, 115, 0, .26);
+}
+
+.jefe-timeline-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 15px;
+    background: rgba(255, 115, 0, .14);
+    color: var(--orange, #ff7300);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.jefe-timeline-body strong {
+    display: block;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 950;
+}
+
+.jefe-timeline-body span {
+    display: block;
+    margin-top: 4px;
+    color: #9ca3af;
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.jefe-pill {
+    min-height: 26px;
+    border-radius: 999px;
+    padding: 6px 9px;
+    background: rgba(255, 115, 0, .12);
+    border: 1px solid rgba(255, 115, 0, .25);
+    color: #ffb36b;
+    font-size: 10px;
+    font-weight: 950;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.jefe-alerts {
+    display: grid;
+    gap: 10px;
+}
+
+.jefe-alert {
+    min-height: 74px;
+    border-radius: 18px;
+    padding: 13px;
+    background: rgba(255, 255, 255, .042);
+    border: 1px solid rgba(255, 255, 255, .075);
+    display: grid;
+    grid-template-columns: 42px 1fr auto;
+    gap: 12px;
+    align-items: center;
+}
+
+.jefe-alert i {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 115, 0, .13);
+    color: var(--orange, #ff7300);
+}
+
+.jefe-alert.warn i {
+    background: rgba(245, 158, 11, .14);
+    color: #facc15;
+}
+
+.jefe-alert.ok i {
+    background: rgba(34, 197, 94, .14);
+    color: #7ddf64;
+}
+
+.jefe-alert strong {
+    display: block;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 950;
+}
+
+.jefe-alert span {
+    display: block;
+    margin-top: 4px;
+    color: #9ca3af;
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.jefe-empty {
+    min-height: 190px;
+    border: 1px dashed rgba(255, 115, 0, .30);
+    border-radius: 22px;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    color: #9ca3af;
+    padding: 24px;
+}
+
+.jefe-empty i {
+    color: var(--orange, #ff7300);
+    font-size: 38px;
+    margin-bottom: 12px;
+}
+
+.jefe-empty strong {
+    display: block;
+    color: #fff;
+    font-size: 16px;
+}
+
+@media (max-width: 1220px) {
+    .jefe-top,
+    .jefe-main-grid,
+    .jefe-bottom-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .jefe-kpis {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .jefe-actions-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 720px) {
+    .jefe-hero,
+    .jefe-profile,
+    .jefe-panel {
+        padding: 20px;
+    }
+
+    .jefe-kpis,
+    .jefe-actions-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .jefe-control,
+    .jefe-timeline-item,
+    .jefe-alert {
+        grid-template-columns: 42px 1fr;
+    }
+
+    .jefe-pill {
+        grid-column: 2;
+        width: fit-content;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% set movimientos = movimientos_brigada if movimientos_brigada is defined else ultimos_movimientos if ultimos_movimientos is defined else ult_mov if ult_mov is defined else [] %}
+{% set total_brigada = total_brigada if total_brigada is defined else n_brigada if n_brigada is defined else '-' %}
+{% set total_consultas = total_consultas if total_consultas is defined else n_busquedas if n_busquedas is defined else '-' %}
+{% set total_memorandos = total_memorandos if total_memorandos is defined else n_memorandos if n_memorandos is defined else '-' %}
+
+<section class="jefe-cmd">
+    <section class="jefe-top">
+        <article class="jefe-hero">
+            <div class="jefe-chip">
+                <i class="fa-solid fa-shield-halved"></i>
+                Panel JEFE
+            </div>
+
+            <h1>Centro de <span>supervisión</span></h1>
+
+            <p>
+                Control operativo SIGEMEP para seguimiento de consultas, movimientos BRIGADA, trazabilidad documental y actividad del sistema.
+            </p>
+
+            <div class="jefe-hero-meta">
+                <span>
+                    <i class="fa-solid fa-circle-check"></i>
+                    Supervisión activa
+                </span>
+
+                <span>
+                    <i class="fa-solid fa-user-tie"></i>
+                    Rol: {{ user.rol }}
+                </span>
+
+                <span>
+                    <i class="fa-solid fa-database"></i>
+                    Sistema en línea
+                </span>
+            </div>
+        </article>
+
+        <aside class="jefe-profile">
+            <div class="jefe-profile-main">
+                <div class="jefe-profile-badge">
+                    <i class="fa-solid fa-ranking-star"></i>
+                </div>
+
+                <div>
+                    <strong>{{ user.usuario }}</strong>
+                    <small>{{ user.rol }}</small>
+                </div>
+            </div>
+
+            <p>
+                Autoridad de supervisión con acceso a movimientos BRIGADA, consulta documental y control interno.
+            </p>
+        </aside>
+    </section>
+
+    <section class="jefe-kpis">
+        <article class="jefe-kpi">
+            <div class="jefe-kpi-icon">
+                <i class="fa-solid fa-users"></i>
+            </div>
+
+            <div>
+                <strong>{{ total_brigada }}</strong>
+                <span>Usuarios BRIGADA</span>
+                <em>Supervisión</em>
+            </div>
+        </article>
+
+        <article class="jefe-kpi">
+            <div class="jefe-kpi-icon">
+                <i class="fa-solid fa-magnifying-glass-chart"></i>
+            </div>
+
+            <div>
+                <strong>{{ total_consultas }}</strong>
+                <span>Consultas registradas</span>
+                <em>Auditoría activa</em>
+            </div>
+        </article>
+
+        <article class="jefe-kpi">
+            <div class="jefe-kpi-icon">
+                <i class="fa-solid fa-folder-open"></i>
+            </div>
+
+            <div>
+                <strong>{{ total_memorandos }}</strong>
+                <span>Memorandos indexados</span>
+                <em>Base documental</em>
+            </div>
+        </article>
+
+        <article class="jefe-kpi">
+            <div class="jefe-kpi-icon">
+                <i class="fa-solid fa-shield-check"></i>
+            </div>
+
+            <div>
+                <strong>Activo</strong>
+                <span>Estado operativo</span>
+                <em>Sin incidencias</em>
+            </div>
+        </article>
+    </section>
+
+    <section class="jefe-main-grid">
+        <article class="jefe-panel">
+            <div class="jefe-panel-head">
+                <div>
+                    <h2>
+                        <i class="fa-solid fa-table-cells-large"></i>
+                        Accesos de mando
+                    </h2>
+                    <p>Operaciones principales del perfil JEFE.</p>
+                </div>
+            </div>
+
+            <div class="jefe-actions-grid">
+                <a href="/buscar" class="jefe-action">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <strong>Buscar memorandos</strong>
+                    <span>Consulta documental</span>
+                </a>
+
+                <a href="/jefe/brigada_movimientos" class="jefe-action">
+                    <i class="fa-solid fa-users-viewfinder"></i>
+                    <strong>Movimientos BRIGADA</strong>
+                    <span>Monitoreo de actividad</span>
+                </a>
+
+                <a href="/jefe/brigada_movimientos" class="jefe-action">
+                    <i class="fa-solid fa-clipboard-list"></i>
+                    <strong>Auditoría operativa</strong>
+                    <span>Rastro y trazabilidad</span>
+                </a>
+
+                <a href="/cambiar_password" class="jefe-action">
+                    <i class="fa-solid fa-key"></i>
+                    <strong>Cambiar contraseña</strong>
+                    <span>Seguridad de cuenta</span>
+                </a>
+            </div>
+        </article>
+
+        <article class="jefe-panel">
+            <div class="jefe-panel-head">
+                <div>
+                    <h2>
+                        <i class="fa-solid fa-circle-check"></i>
+                        Criterios de control
+                    </h2>
+                    <p>Indicadores institucionales de supervisión.</p>
+                </div>
+            </div>
+
+            <div class="jefe-control-list">
+                <div class="jefe-control">
+                    <i class="fa-solid fa-check"></i>
+                    <div>
+                        <strong>Legalidad y normativa</strong>
+                        <span>Uso interno conforme a permisos del sistema.</span>
+                    </div>
+                    <em>Cumple</em>
+                </div>
+
+                <div class="jefe-control">
+                    <i class="fa-solid fa-check"></i>
+                    <div>
+                        <strong>Integridad de información</strong>
+                        <span>Consulta documental protegida y auditada.</span>
+                    </div>
+                    <em>Cumple</em>
+                </div>
+
+                <div class="jefe-control">
+                    <i class="fa-solid fa-check"></i>
+                    <div>
+                        <strong>Trazabilidad</strong>
+                        <span>Registro verificable de movimientos.</span>
+                    </div>
+                    <em>Cumple</em>
+                </div>
+
+                <div class="jefe-control">
+                    <i class="fa-solid fa-check"></i>
+                    <div>
+                        <strong>Control de accesos</strong>
+                        <span>Roles diferenciados por responsabilidad.</span>
+                    </div>
+                    <em>Cumple</em>
+                </div>
+            </div>
+        </article>
+    </section>
+
+    <section class="jefe-bottom-grid">
+        <article class="jefe-panel">
+            <div class="jefe-panel-head">
+                <div>
+                    <h2>
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        Actividad reciente BRIGADA
+                    </h2>
+                    <p>Últimos movimientos disponibles para supervisión.</p>
+                </div>
+
+                <a href="/jefe/brigada_movimientos" class="jefe-link-lite">
+                    Ver todo
+                    <i class="fa-solid fa-arrow-right"></i>
+                </a>
+            </div>
+
+            <div class="jefe-timeline">
+                {% for r in movimientos[:6] %}
+                <a href="/jefe/brigada_movimientos" class="jefe-timeline-item">
+                    <div class="jefe-timeline-icon">
+                        {% if r.accion and 'BUSQUEDA' in r.accion %}
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        {% elif r.accion and 'LOGIN' in r.accion %}
+                            <i class="fa-solid fa-right-to-bracket"></i>
+                        {% elif r.accion and 'PRIMERA_HOJA' in r.accion %}
+                            <i class="fa-solid fa-eye"></i>
+                        {% elif r.accion and 'PDF' in r.accion %}
+                            <i class="fa-solid fa-file-pdf"></i>
+                        {% else %}
+                            <i class="fa-solid fa-circle-info"></i>
+                        {% endif %}
+                    </div>
+
+                    <div class="jefe-timeline-body">
+                        <strong>{{ r.accion or 'Movimiento' }}</strong>
+                        <span>
+                            {{ r.u_nom or r.usuario or r.usuario_nombre or 'Usuario BRIGADA' }}
+                            {% if r.detalle %} · {{ r.detalle|string|truncate(70) }}{% endif %}
+                        </span>
+                    </div>
+
+                    <span class="jefe-pill">
+                        {{ r.resultado or 'OK' }}
+                    </span>
+                </a>
+                {% else %}
+                <div class="jefe-empty">
+                    <div>
+                        <i class="fa-solid fa-folder-open"></i>
+                        <strong>Sin movimientos recientes</strong>
+                        <p>Cuando BRIGADA realice consultas, aparecerán en este resumen.</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="jefe-panel">
+            <div class="jefe-panel-head">
+                <div>
+                    <h2>
+                        <i class="fa-solid fa-bell"></i>
+                        Alertas operativas
+                    </h2>
+                    <p>Estado general del sistema y recomendaciones.</p>
+                </div>
+            </div>
+
+            <div class="jefe-alerts">
+                <div class="jefe-alert ok">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <div>
+                        <strong>Sistema operativo</strong>
+                        <span>SIGEMEP se encuentra disponible para consultas.</span>
+                    </div>
+                    <span class="jefe-pill">Baja</span>
+                </div>
+
+                <div class="jefe-alert warn">
+                    <i class="fa-solid fa-database"></i>
+                    <div>
+                        <strong>Indexación</strong>
+                        <span>Los resultados dependen de la última indexación realizada.</span>
+                    </div>
+                    <span class="jefe-pill">Media</span>
+                </div>
+
+                <div class="jefe-alert">
+                    <i class="fa-solid fa-user-lock"></i>
+                    <div>
+                        <strong>Credenciales personales</strong>
+                        <span>No compartir usuarios ni contraseñas entre operadores.</span>
+                    </div>
+                    <span class="jefe-pill">Alta</span>
+                </div>
+            </div>
+        </article>
+    </section>
+</section>
+{% endblock %}

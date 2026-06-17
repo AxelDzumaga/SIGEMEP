@@ -1,0 +1,508 @@
+{% extends "base.html" %}
+
+{% block title %}Ingresar · SIGEMEP{% endblock %}
+{% block page_title %}SIGEMEP{% endblock %}
+
+{% block head %}
+<style>
+    /*
+      LOGIN VISUAL SIGEMEP
+      - No cambia rutas
+      - No cambia nombres de campos
+      - No usa JavaScript
+      - Mantiene POST /login con usuario + password
+    */
+
+    .topbar,
+    .sidebar,
+    .app-sidebar,
+    .navbar {
+        display: none !important;
+    }
+
+    .main,
+    .content,
+    .page,
+    .app-main {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: none !important;
+    }
+
+    body {
+        background: #05080b !important;
+        overflow-x: hidden;
+    }
+
+    .login-visual-screen {
+        position: relative;
+        min-height: 100vh;
+        width: 100%;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 36px;
+        background:
+            radial-gradient(circle at 0% 0%, rgba(255, 115, 0, 0.28), transparent 26%),
+            radial-gradient(circle at 100% 100%, rgba(255, 115, 0, 0.18), transparent 30%),
+            linear-gradient(135deg, #05080b 0%, #071015 48%, #030506 100%);
+        color: #ffffff;
+    }
+
+    .login-visual-screen::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(120deg, transparent 0 18%, rgba(255, 115, 0, 0.075) 18.2%, transparent 18.4% 100%),
+            linear-gradient(145deg, transparent 0 42%, rgba(255, 115, 0, 0.055) 42.2%, transparent 42.6% 100%),
+            repeating-linear-gradient(
+                0deg,
+                rgba(255, 255, 255, 0.017) 0px,
+                rgba(255, 255, 255, 0.017) 1px,
+                transparent 1px,
+                transparent 34px
+            ),
+            repeating-linear-gradient(
+                90deg,
+                rgba(255, 255, 255, 0.012) 0px,
+                rgba(255, 255, 255, 0.012) 1px,
+                transparent 1px,
+                transparent 34px
+            );
+        opacity: 0.74;
+        pointer-events: none;
+    }
+
+    .login-visual-screen::after {
+        content: "";
+        position: absolute;
+        left: -10%;
+        bottom: 7%;
+        width: 54%;
+        height: 34%;
+        background:
+            radial-gradient(circle at 22% 68%, rgba(255, 115, 0, 0.32), transparent 12%),
+            repeating-linear-gradient(
+                -10deg,
+                rgba(255, 115, 0, 0.24) 0px,
+                rgba(255, 115, 0, 0.24) 1px,
+                transparent 1px,
+                transparent 10px
+            );
+        opacity: 0.21;
+        filter: blur(0.2px);
+        transform: rotate(-7deg);
+        pointer-events: none;
+    }
+
+    .login-watermark-text {
+        position: absolute;
+        left: 3.5%;
+        top: 23%;
+        display: grid;
+        gap: 14px;
+        color: rgba(255, 115, 0, 0.10);
+        font-size: clamp(31px, 3.8vw, 64px);
+        line-height: 0.92;
+        font-weight: 950;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        user-select: none;
+        pointer-events: none;
+        max-width: 52%;
+        z-index: 1;
+    }
+
+    .login-watermark-shield {
+        position: absolute;
+        right: 8%;
+        top: 15%;
+        width: min(38vw, 520px);
+        height: min(38vw, 520px);
+        border-radius: 44px;
+        border: 1px solid rgba(255, 255, 255, 0.055);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgba(255, 255, 255, 0.035);
+        font-size: min(23vw, 330px);
+        transform: rotate(-2deg);
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .login-watermark-shield::before {
+        content: "";
+        position: absolute;
+        inset: 38px;
+        border-radius: 40px;
+        border: 1px solid rgba(255, 115, 0, 0.055);
+    }
+
+    .login-corner {
+        position: absolute;
+        width: 310px;
+        height: 210px;
+        border: 1px solid rgba(255, 115, 0, 0.16);
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .login-corner-left {
+        left: 18px;
+        top: 58px;
+        border-right: none;
+        border-bottom: none;
+        border-radius: 24px 0 0 0;
+    }
+
+    .login-corner-right {
+        right: 30px;
+        bottom: 34px;
+        border-left: none;
+        border-top: none;
+        border-radius: 0 0 28px 0;
+    }
+
+    .login-card {
+        position: relative;
+        z-index: 5;
+        width: min(100%, 455px);
+        background:
+            radial-gradient(circle at top right, rgba(255, 115, 0, 0.15), transparent 34%),
+            linear-gradient(145deg, rgba(18, 24, 28, 0.96), rgba(5, 8, 10, 0.985));
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-left: 5px solid #ff7300;
+        border-radius: 30px;
+        padding: 38px;
+        box-shadow:
+            0 32px 90px rgba(0, 0, 0, 0.62),
+            0 0 60px rgba(255, 115, 0, 0.12),
+            inset 0 0 35px rgba(255, 115, 0, 0.035);
+        backdrop-filter: blur(10px);
+    }
+
+    .login-logo {
+        width: 66px;
+        height: 66px;
+        border-radius: 22px;
+        background: linear-gradient(145deg, #ff8a00, #ff7300);
+        color: #111111;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 30px;
+        box-shadow: 0 0 35px rgba(255, 115, 0, 0.30);
+        margin-bottom: 24px;
+    }
+
+    .login-card h1 {
+        margin: 0;
+        color: #ffffff;
+        font-size: 38px;
+        font-weight: 950;
+        letter-spacing: 0.5px;
+    }
+
+    .login-subtitle {
+        margin: 8px 0 28px;
+        color: #aeb7c4;
+        font-size: 15px;
+        line-height: 1.45;
+    }
+
+    .login-alert {
+        margin-bottom: 18px;
+        border-radius: 16px;
+        background: rgba(239, 68, 68, 0.13);
+        border: 1px solid rgba(239, 68, 68, 0.34);
+        color: #fca5a5;
+        padding: 13px 14px;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        font-weight: 850;
+        line-height: 1.4;
+    }
+
+    .login-form {
+        display: grid;
+        gap: 17px;
+    }
+
+    .login-form label {
+        display: grid;
+        gap: 8px;
+    }
+
+    .login-form label span {
+        color: #f3f4f6;
+        font-size: 14px;
+        font-weight: 900;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .login-form input {
+        width: 100%;
+        height: 52px;
+        background: rgba(255, 255, 255, 0.065) !important;
+        border: 1px solid rgba(255, 255, 255, 0.14) !important;
+        border-radius: 16px !important;
+        padding: 0 15px !important;
+        color: #ffffff !important;
+        outline: none !important;
+        font-size: 15px !important;
+        box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.22) !important;
+    }
+
+    .login-form input::placeholder {
+        color: #778294 !important;
+    }
+
+    .login-form input:focus {
+        border-color: rgba(255, 115, 0, 0.72) !important;
+        box-shadow:
+            0 0 0 4px rgba(255, 115, 0, 0.13),
+            inset 0 0 18px rgba(0, 0, 0, 0.22) !important;
+    }
+
+    .login-btn {
+        height: 54px;
+        margin-top: 2px;
+        border: none;
+        border-radius: 16px;
+        background: linear-gradient(145deg, #ff8a00, #ff7300);
+        color: #111111;
+        font-size: 16px;
+        font-weight: 950;
+        cursor: pointer;
+        box-shadow: 0 0 30px rgba(255, 115, 0, 0.32);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .login-btn:hover {
+        background: linear-gradient(145deg, #ffa332, #ff7a00);
+        transform: translateY(-1px);
+    }
+
+    .login-separator {
+        height: 1px;
+        margin: 23px 0 16px;
+        background: rgba(255, 255, 255, 0.09);
+    }
+
+    .register-link {
+        min-height: 42px;
+        color: #ffb36b !important;
+        text-decoration: none !important;
+        font-weight: 950;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        text-align: center;
+    }
+
+    .register-link:hover {
+        color: #ffffff !important;
+    }
+
+    .login-footer {
+        text-align: center;
+        margin-top: 14px;
+        color: #7e8a9b;
+        font-size: 12px;
+        font-weight: 950;
+        letter-spacing: 1.2px;
+    }
+
+    .login-values {
+        position: absolute;
+        left: 56px;
+        bottom: 48px;
+        z-index: 3;
+        display: flex;
+        gap: 46px;
+        color: rgba(255, 255, 255, 0.14);
+        text-transform: uppercase;
+        font-size: 11px;
+        font-weight: 850;
+        letter-spacing: 0.4px;
+        pointer-events: none;
+    }
+
+    .login-values div {
+        display: grid;
+        justify-items: center;
+        gap: 9px;
+    }
+
+    .login-values i {
+        font-size: 23px;
+        color: rgba(255, 255, 255, 0.18);
+    }
+
+    @media (max-width: 900px) {
+        .login-watermark-text {
+            left: 6%;
+            top: 10%;
+            max-width: 90%;
+            font-size: 30px;
+            opacity: 0.42;
+        }
+
+        .login-watermark-shield {
+            right: -12%;
+            top: 46%;
+            opacity: 0.65;
+        }
+
+        .login-values {
+            display: none;
+        }
+    }
+
+    @media (max-width: 560px) {
+        .login-visual-screen {
+            padding: 20px;
+            align-items: flex-start;
+            padding-top: 54px;
+        }
+
+        .login-card {
+            padding: 28px;
+            border-radius: 24px;
+        }
+
+        .login-card h1 {
+            font-size: 34px;
+        }
+
+        .login-corner {
+            display: none;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<main class="login-visual-screen">
+
+    <div class="login-watermark-text">
+        <span>DIVISION SEGUIMIENTO</span>
+        <span>DE LAS CONDUCTAS POLICIALES</span>
+    </div>
+
+    <div class="login-watermark-shield">
+        <i class="fa-solid fa-shield-halved"></i>
+    </div>
+
+    <div class="login-corner login-corner-left"></div>
+    <div class="login-corner login-corner-right"></div>
+
+    <section class="login-card">
+
+        <div class="login-logo">
+            <i class="fa-solid fa-shield-halved"></i>
+        </div>
+
+        <h1>SIGEMEP</h1>
+
+        <p class="login-subtitle">
+            Sistema de Consulta y Auditoría de Memorandos
+        </p>
+
+        {% if error %}
+        <div class="login-alert">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>{{ error }}</span>
+        </div>
+        {% endif %}
+
+        <form method="post" action="/login" autocomplete="off" class="login-form">
+
+            <label>
+                <span>
+                    <i class="fa-solid fa-user"></i>
+                    Usuario
+                </span>
+
+                <input
+                    type="text"
+                    name="usuario"
+                    placeholder="Ingrese su usuario"
+                    autocomplete="username"
+                    required
+                    autofocus
+                >
+            </label>
+
+            <label>
+                <span>
+                    <i class="fa-solid fa-lock"></i>
+                    Contraseña
+                </span>
+
+                <input
+                    type="password"
+                    name="password"
+                    placeholder="Ingrese su contraseña"
+                    autocomplete="current-password"
+                    required
+                >
+            </label>
+
+            <button type="submit" class="login-btn">
+                <i class="fa-solid fa-right-to-bracket"></i>
+                Ingresar
+            </button>
+
+        </form>
+
+        <div class="login-separator"></div>
+
+        <a href="/registro" class="register-link">
+            <i class="fa-solid fa-user-plus"></i>
+            Registrarse como JEFE o BRIGADA
+        </a>
+
+        <div class="login-footer">
+            SIGEMEP · USO INTERNO
+        </div>
+
+    </section>
+
+    <div class="login-values">
+        <div>
+            <i class="fa-solid fa-shield-halved"></i>
+            <span>Integridad</span>
+        </div>
+
+        <div>
+            <i class="fa-regular fa-file-lines"></i>
+            <span>Transparencia</span>
+        </div>
+
+        <div>
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span>Control</span>
+        </div>
+
+        <div>
+            <i class="fa-solid fa-users"></i>
+            <span>Responsabilidad</span>
+        </div>
+    </div>
+
+</main>
+
+{% endblock %}

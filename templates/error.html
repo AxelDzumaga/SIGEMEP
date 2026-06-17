@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Error · SIGEMEP{% endblock %}
+{% block page_title %}Error del sistema{% endblock %}
+{% block content %}
+<section class="center-card"><div class="center-icon danger"><i class="fa-solid fa-triangle-exclamation"></i></div><h1>Ocurrió un error</h1><p>{{ mensaje or 'Ocurrió un error en el sistema.' }}</p><a href="/" class="btn btn-primary"><i class="fa-solid fa-house"></i> Volver al inicio</a></section>
+{% endblock %}

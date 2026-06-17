@@ -1,0 +1,374 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo memorando · SIGEMEP{% endblock %}
+{% block page_title %}Confeccionar memorando{% endblock %}
+
+{% block head %}
+<style>
+.memo-layout{display:grid;grid-template-columns:1fr 420px;gap:22px;align-items:start}
+.memo-form-card,.memo-preview-card{background:linear-gradient(145deg,rgba(18,24,28,.96),rgba(7,10,12,.99));border:1px solid rgba(255,255,255,.10);border-radius:26px;padding:26px;box-shadow:0 22px 55px rgba(0,0,0,.35)}
+.memo-preview-card{position:sticky;top:20px}
+.memo-section-title{color:var(--orange,#ff7300);font-size:12px;font-weight:950;letter-spacing:.6px;text-transform:uppercase;margin:22px 0 10px;display:flex;align-items:center;gap:8px}
+.memo-section-title:first-child{margin-top:0}
+.memo-section-title i{font-size:13px}
+.memo-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.memo-grid.full{grid-template-columns:1fr}
+.memo-grid.trio{grid-template-columns:1fr 1fr 1fr}
+.memo-field label{display:block;color:#9ca3af;font-size:11px;font-weight:950;letter-spacing:.4px;text-transform:uppercase;margin-bottom:5px}
+.memo-field input,.memo-field select,.memo-field textarea{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:12px;color:#fff;font-size:13px;padding:10px 12px;outline:none;transition:border-color .2s,box-shadow .2s;box-sizing:border-box;font-family:inherit}
+.memo-field input:focus,.memo-field select:focus,.memo-field textarea:focus{border-color:rgba(255,115,0,.55);box-shadow:0 0 0 3px rgba(255,115,0,.12)}
+.memo-field select option{background:#1a1f23;color:#fff}
+.memo-field textarea{resize:vertical;min-height:80px}
+.memo-field textarea.tall{min-height:130px}
+.memo-divider{border:none;border-top:1px solid rgba(255,255,255,.08);margin:18px 0}
+.memo-filename{margin:14px 0;padding:10px 14px;background:rgba(255,115,0,.09);border:1px solid rgba(255,115,0,.25);border-radius:12px;color:#ffb36b;font-size:12px;font-family:Consolas,monospace;word-break:break-all}
+.memo-filename span{color:#9ca3af;font-family:inherit;font-size:11px}
+.memo-btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:44px;border-radius:14px;padding:10px 18px;font-weight:950;font-size:14px;cursor:pointer;border:none;transition:all .2s;font-family:inherit}
+.memo-btn-preview{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.18);color:#fff;width:100%;margin-bottom:10px}
+.memo-btn-preview:hover{background:rgba(255,115,0,.12);border-color:rgba(255,115,0,.35)}
+.memo-btn-save{background:linear-gradient(145deg,#ff8a00,#ff7300);color:#111;width:100%;box-shadow:0 0 24px rgba(255,115,0,.25)}
+.memo-btn-save:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 0 32px rgba(255,115,0,.38)}
+.memo-btn-save:disabled{opacity:.38;cursor:not-allowed;transform:none}
+.memo-preview-img{width:100%;border-radius:12px;border:1px solid rgba(255,255,255,.10);margin-top:12px;display:none}
+.memo-preview-placeholder{min-height:280px;border:1px dashed rgba(255,115,0,.30);border-radius:16px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:#9ca3af;text-align:center;padding:20px}
+.memo-preview-placeholder i{font-size:38px;color:rgba(255,115,0,.45)}
+.memo-preview-placeholder strong{color:#d1d5db;font-size:15px}
+.memo-preview-placeholder p{margin:0;font-size:13px;max-width:260px;line-height:1.45}
+.memo-preview-head{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.memo-preview-head h3{margin:0;color:#fff;font-size:16px;font-weight:950}
+.memo-preview-head i{color:var(--orange,#ff7300)}
+.memo-alert{display:none;padding:12px 14px;border-radius:12px;font-size:13px;margin-bottom:14px}
+.memo-alert.error{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#fca5a5}
+.memo-alert.success{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35);color:#86efac}
+.memo-spinner{display:none;text-align:center;padding:20px;color:#9ca3af}
+.memo-spinner i{font-size:24px;color:var(--orange,#ff7300);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.memo-badge-preview{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.30);color:#86efac;font-size:11px;font-weight:950;margin-left:auto}
+@media(max-width:1100px){.memo-layout{grid-template-columns:1fr}.memo-preview-card{position:static}}
+@media(max-width:640px){.memo-grid{grid-template-columns:1fr}.memo-grid.trio{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="memo-layout">
+
+  <!-- ── COLUMNA IZQUIERDA: FORMULARIO ── -->
+  <div class="memo-form-card">
+    <div id="memo-alert" class="memo-alert"></div>
+
+    <div style="margin-bottom:16px;display:flex;justify-content:flex-end">
+      <button type="button" onclick="autocompletar()" style="display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:10px;background:rgba(255,115,0,.10);border:1px dashed rgba(255,115,0,.40);color:#ffb36b;font-size:12px;font-weight:950;cursor:pointer;font-family:inherit">
+        <i class="fa-solid fa-wand-magic-sparkles"></i> Autocompletar (test)
+      </button>
+    </div>
+
+    <form id="memo-form" method="post">
+
+      <!-- IDENTIFICACIÓN -->
+      <div class="memo-section-title"><i class="fa-solid fa-hashtag"></i> Identificación</div>
+      <div class="memo-grid trio">
+        <div class="memo-field">
+          <label>Número correlativo *</label>
+          <input type="number" name="nro" id="f-nro" min="1" required placeholder="ej: 145">
+        </div>
+        <div class="memo-field">
+          <label>Año *</label>
+          <input type="number" name="anio" id="f-anio" value="{{ anio }}" min="2020" max="2099" required>
+        </div>
+        <div class="memo-field">
+          <label>Iniciales</label>
+          <input type="text" name="iniciales" id="f-iniciales" placeholder="ej: f.m.ch.">
+        </div>
+      </div>
+      <div class="memo-grid" style="margin-top:12px">
+        <div class="memo-field">
+          <label>Fecha del memorando *</label>
+          <input type="date" name="fecha_memo" id="f-fecha-memo" value="{{ hoy }}" required>
+        </div>
+      </div>
+
+      <hr class="memo-divider">
+
+      <!-- DESTINATARIO -->
+      <div class="memo-section-title"><i class="fa-solid fa-paper-plane"></i> Destinatario</div>
+      <div class="memo-grid full">
+        <div class="memo-field">
+          <label>DE *</label>
+          <input type="text" name="de" id="f-de" value="Departamento CONTROL DE INTEGRIDAD PROFESIONAL.-" required>
+        </div>
+      </div>
+      <div class="memo-grid full" style="margin-top:12px">
+        <div class="memo-field">
+          <label>A *</label>
+          <input type="text" name="a" id="f-a" placeholder="ej: ARCHIVO 920.-" required>
+        </div>
+      </div>
+
+      <hr class="memo-divider">
+
+      <!-- HECHO -->
+      <div class="memo-section-title"><i class="fa-solid fa-triangle-exclamation"></i> Hecho</div>
+      <div class="memo-grid full">
+        <div class="memo-field">
+          <label>Hecho *</label>
+          <input type="text" name="hecho" id="f-hecho" placeholder="ej: ROBO AGRAVADO" required
+                 style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+        </div>
+      </div>
+      <div class="memo-grid" style="margin-top:12px">
+        <div class="memo-field">
+          <label>Tipo de fecha *</label>
+          <select name="tipo_fecha" id="f-tipo-fecha" required>
+            <option value="FECHA DEL HECHO">FECHA DEL HECHO</option>
+            <option value="FECHA DE DENUNCIA">FECHA DE DENUNCIA</option>
+            <option value="FECHA DE INICIO">FECHA DE INICIO</option>
+          </select>
+        </div>
+        <div class="memo-field">
+          <label>Fecha del hecho *</label>
+          <input type="date" name="fecha_hecho" id="f-fecha-hecho" required>
+        </div>
+      </div>
+      <div class="memo-grid full" style="margin-top:12px">
+        <div class="memo-field">
+          <label>Hora</label>
+          <input type="text" name="hora" id="f-hora" placeholder="ej: 03:30 aproximadamente.">
+        </div>
+      </div>
+      <div class="memo-grid full" style="margin-top:12px">
+        <div class="memo-field">
+          <label>Lugar del hecho *</label>
+          <textarea name="lugar" id="f-lugar" required placeholder="ej: Interseccion Av. Corrientes y Callao, CABA."></textarea>
+        </div>
+      </div>
+
+      <hr class="memo-divider">
+
+      <!-- PERSONAS -->
+      <div class="memo-section-title"><i class="fa-solid fa-user"></i> Personas</div>
+      <div class="memo-grid" style="margin-top:0">
+        <div class="memo-field">
+          <label>Tipo de persona *</label>
+          <select name="etiqueta_persona" id="f-etiqueta" required>
+            <option value="DAMNIFICADO">DAMNIFICADO</option>
+            <option value="DAMNIFICADA">DAMNIFICADA</option>
+            <option value="DENUNCIANTE">DENUNCIANTE</option>
+            <option value="PARTES">PARTES</option>
+          </select>
+        </div>
+      </div>
+      <div class="memo-grid full" style="margin-top:12px">
+        <div class="memo-field">
+          <label>Datos de la persona</label>
+          <textarea name="persona" id="f-persona" placeholder="Nombre, LP, DNI, dependencia, etc."></textarea>
+        </div>
+      </div>
+      <div class="memo-grid full" style="margin-top:12px">
+        <div class="memo-field">
+          <label>Imputado/s</label>
+          <textarea name="imputado" id="f-imputado" placeholder="ej: N.N. masculino profugo."></textarea>
+        </div>
+      </div>
+
+      <hr class="memo-divider">
+
+      <!-- ELEMENTOS -->
+      <div class="memo-section-title"><i class="fa-solid fa-box-open"></i> Elementos</div>
+      <div class="memo-grid full">
+        <div class="memo-field">
+          <label>Elementos sustraídos *</label>
+          <input type="text" name="elementos_sustraidos" value="No hubo." required>
+        </div>
+      </div>
+      <div class="memo-grid full" style="margin-top:12px">
+        <div class="memo-field">
+          <label>Elementos secuestrados *</label>
+          <input type="text" name="elementos_secuestrados" value="No hubo." required>
+        </div>
+      </div>
+
+      <hr class="memo-divider">
+
+      <!-- ACTUACIÓN -->
+      <div class="memo-section-title"><i class="fa-solid fa-scale-balanced"></i> Actuación</div>
+      <div class="memo-grid full">
+        <div class="memo-field">
+          <label>Dependencia preventora</label>
+          <textarea name="dependencia" id="f-dependencia" placeholder="ej: Comisaria 3ra., Policia de la Prov. de Buenos Aires."></textarea>
+        </div>
+      </div>
+      <div class="memo-grid full" style="margin-top:12px">
+        <div class="memo-field">
+          <label>Magistrado interventor</label>
+          <textarea name="magistrado" id="f-magistrado" placeholder="ej: UFI N 2, a cargo de la Dra. Maria GARCIA."></textarea>
+        </div>
+      </div>
+
+      <hr class="memo-divider">
+
+      <!-- RESEÑA -->
+      <div class="memo-section-title"><i class="fa-solid fa-align-left"></i> Breve reseña</div>
+      <div class="memo-grid full">
+        <div class="memo-field">
+          <label>Reseña *</label>
+          <textarea name="resena" id="f-resena" class="tall" required
+                    placeholder="Descripción del hecho..."></textarea>
+        </div>
+      </div>
+
+    </form><!-- /form -->
+  </div><!-- /columna izquierda -->
+
+  <!-- ── COLUMNA DERECHA: PREVIEW ── -->
+  <div class="memo-preview-card">
+    <div class="memo-preview-head">
+      <i class="fa-solid fa-file-pdf"></i>
+      <h3>Vista previa</h3>
+      <span id="preview-badge" class="memo-badge-preview" style="display:none"><i class="fa-solid fa-check"></i> Lista</span>
+    </div>
+
+    <div class="memo-filename">
+      <span>Nombre del archivo:</span><br>
+      <span id="filename-display">— completá NRO, HECHO y fecha del hecho —</span>
+    </div>
+
+    <button type="button" class="memo-btn memo-btn-preview" id="btn-preview" onclick="generarPreview()">
+      <i class="fa-solid fa-eye"></i> Generar vista previa
+    </button>
+
+    <div id="preview-spinner" class="memo-spinner"><i class="fa-solid fa-circle-notch"></i></div>
+
+    <div id="preview-placeholder" class="memo-preview-placeholder">
+      <i class="fa-solid fa-file-pdf"></i>
+      <strong>Preview del memorando</strong>
+      <p>Completá los campos y hacé clic en "Generar vista previa" para ver cómo quedará el PDF.</p>
+    </div>
+
+    <img id="preview-img" class="memo-preview-img" alt="Vista previa del memorando">
+
+    <button type="button" class="memo-btn memo-btn-save" id="btn-save" disabled onclick="guardarMemo()">
+      <i class="fa-solid fa-floppy-disk"></i> Guardar memorando
+    </button>
+  </div>
+
+</div><!-- /layout -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  // ── Autocompletado de prueba ──────────────────────────────────
+  window.autocompletar = function(){
+    const hoy = new Date().toISOString().slice(0,10);
+    const set = (id, val) => { const el = document.getElementById(id); if(el){ el.value = val; } };
+    const setName = (name, val) => { const el = document.querySelector(`[name="${name}"]`); if(el){ el.value = val; } };
+
+    set('f-nro',        '145');
+    set('f-anio',       new Date().getFullYear());
+    set('f-iniciales',  'f.m.ch.');
+    set('f-fecha-memo', hoy);
+    set('f-de',         'Departamento CONTROL DE INTEGRIDAD PROFESIONAL.-');
+    set('f-a',          'ARCHIVO 920.-');
+    set('f-hecho',      'ROBO AGRAVADO');
+    set('f-tipo-fecha', 'FECHA DEL HECHO');
+    set('f-fecha-hecho', hoy);
+    set('f-hora',       '03:30 aproximadamente.');
+    set('f-lugar',      'Interseccion Av. Corrientes y Callao, Ciudad Autonoma de Buenos Aires.');
+    set('f-etiqueta',   'DAMNIFICADO');
+    set('f-persona',    'Agente LP 12345 (DNI 30.000.001) Juan PEREZ, Comisaria 1ra. CABA.');
+    set('f-imputado',   'N.N. masculino, profugo.');
+    setName('elementos_sustraidos',   'Telefono celular marca Samsung color negro.');
+    setName('elementos_secuestrados', 'No hubo.');
+    set('f-dependencia', 'Comisaria 1ra., Policia de la Ciudad Autonoma de Buenos Aires.');
+    set('f-magistrado',  'UFI N 2, a cargo de la Dra. Maria GARCIA.');
+    set('f-resena',      'En el dia de la fecha, siendo aproximadamente las 03:30 horas, personal de guardia de esta dependencia tomo conocimiento mediante escucha de frecuencia policial que en el lugar indicado ut supra se habia producido el hecho de referencia. En virtud de ello se labraron las actuaciones del caso y se dio inmediata intervención al Magistrado de turno.');
+    actualizarNombre();
+  };
+
+  // ── Nombre de archivo en tiempo real ──────────────────────────
+  function limpiarHecho(h){
+    return h.replace(/[\\/:*?<>|]/g,'').replace(/\s+/g,' ').trim().replace(/^[.\- ]+|[.\- ]+$/g,'');
+  }
+  function actualizarNombre(){
+    const nro   = document.getElementById('f-nro').value.trim();
+    const hecho = limpiarHecho(document.getElementById('f-hecho').value.trim());
+    const fh    = document.getElementById('f-fecha-hecho').value;
+    const el    = document.getElementById('filename-display');
+    if(!nro || !hecho || !fh){ el.textContent='— completá NRO, HECHO y fecha del hecho —'; return; }
+    el.textContent = `${nro}-"${hecho}"-${fh}.pdf`;
+  }
+  ['f-nro','f-hecho','f-fecha-hecho'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', actualizarNombre);
+  });
+
+  // ── AJAX Preview ──────────────────────────────────────────────
+  window.generarPreview = async function(){
+    const form   = document.getElementById('memo-form');
+    const btn    = document.getElementById('btn-preview');
+    const img    = document.getElementById('preview-img');
+    const ph     = document.getElementById('preview-placeholder');
+    const sp     = document.getElementById('preview-spinner');
+    const alert  = document.getElementById('memo-alert');
+    const badge  = document.getElementById('preview-badge');
+
+    alert.style.display='none';
+    btn.disabled=true;
+    ph.style.display='none';
+    img.style.display='none';
+    sp.style.display='block';
+
+    try{
+      const fd = new FormData(form);
+      const r  = await fetch('/brigada/nuevo_memorando/preview',{method:'POST',body:fd});
+      const data = await r.json();
+      if(!r.ok){ throw new Error(data.detail || 'Error generando preview'); }
+      img.src='data:image/png;base64,'+data.png_b64;
+      img.style.display='block';
+      badge.style.display='inline-flex';
+      document.getElementById('btn-save').disabled=false;
+      document.getElementById('filename-display').textContent=data.nombre;
+    }catch(e){
+      alert.textContent='Error: '+e.message;
+      alert.className='memo-alert error';
+      alert.style.display='block';
+      ph.style.display='flex';
+    }finally{
+      sp.style.display='none';
+      btn.disabled=false;
+    }
+  };
+
+  // ── Guardar ───────────────────────────────────────────────────
+  window.guardarMemo = async function(){
+    const form  = document.getElementById('memo-form');
+    const btn   = document.getElementById('btn-save');
+    const alert = document.getElementById('memo-alert');
+    alert.style.display='none';
+    btn.disabled=true;
+    btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Guardando...';
+
+    const fd = new FormData(form);
+    try{
+      const r = await fetch('/brigada/nuevo_memorando/guardar',{method:'POST',body:fd,redirect:'manual'});
+      if(r.type==='opaqueredirect'||r.status===0||r.redirected){
+        window.location.href='/dashboard/brigada?memo_creado=1';
+        return;
+      }
+      if(r.ok || r.status===302){
+        const loc = r.headers.get('location') || r.url;
+        window.location.href = loc || '/dashboard/brigada';
+        return;
+      }
+      const data = await r.json().catch(()=>({detail:'Error desconocido'}));
+      throw new Error(data.detail || 'Error al guardar');
+    }catch(e){
+      alert.textContent='Error: '+e.message;
+      alert.className='memo-alert error';
+      alert.style.display='block';
+      btn.disabled=false;
+      btn.innerHTML='<i class="fa-solid fa-floppy-disk"></i> Guardar memorando';
+    }
+  };
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Primera hoja · SIGEMEP{% endblock %}
+{% block body_class %}app-body protect-view{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4"><div><h1 class="page-title">Vista protegida</h1><div class="page-subtitle">{{ mem.nombre_archivo }} · SIGEMEP - USO INTERNO</div></div><a href="javascript:history.back()" class="btn btn-outline-dark"><i class="bi bi-arrow-left"></i> Volver</a></div>
+<div class="viewer-frame sigemep-protect text-center"><img id="visor-img" class="viewer-img" src="data:image/png;base64,{{ imagen_b64 }}" alt="Primera hoja" draggable="false"></div>
+<div class="alert alert-warning mt-3"><i class="bi bi-shield-lock"></i> La imagen incluye marca de agua con usuario, rol, fecha, hora e IP. Toda visualización queda registrada.</div>
+{% endblock %}
+{% block scripts %}<script src="/static/js/security.js"></script>{% endblock %}

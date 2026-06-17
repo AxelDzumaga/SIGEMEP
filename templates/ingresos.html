@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Ingresos y salidas · SIGEMEP{% endblock %}
+{% block page_title %}Ingresos y salidas{% endblock %}
+
+{% block content %}
+
+<section class="access-header">
+    <div>
+        <span class="section-tag">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+            Control de accesos
+        </span>
+
+        <h1>Ingresos y salidas</h1>
+
+        <p>
+            Registro de login exitoso, login fallido y cierre de sesión de usuarios.
+        </p>
+    </div>
+
+    <a href="/dashboard/admin" class="btn btn-outline">
+        <i class="fa-solid fa-arrow-left"></i>
+        Volver al panel
+    </a>
+</section>
+
+<section class="access-summary-grid">
+    <article class="access-summary-card">
+        <div class="access-summary-icon green">
+            <i class="fa-solid fa-right-to-bracket"></i>
+        </div>
+        <div>
+            <strong>Login</strong>
+            <span>Ingresos exitosos</span>
+        </div>
+    </article>
+
+    <article class="access-summary-card">
+        <div class="access-summary-icon red">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div>
+            <strong>Fallidos</strong>
+            <span>Intentos rechazados</span>
+        </div>
+    </article>
+
+    <article class="access-summary-card">
+        <div class="access-summary-icon orange">
+            <i class="fa-solid fa-right-from-bracket"></i>
+        </div>
+        <div>
+            <strong>Logout</strong>
+            <span>Cierres de sesión</span>
+        </div>
+    </article>
+</section>
+
+<section class="access-card">
+
+    <div class="access-card-head">
+        <div>
+            <h2>
+                <i class="fa-solid fa-list-check"></i>
+                Registro de accesos
+            </h2>
+            <p>Historial cronológico de actividad de inicio y cierre de sesión.</p>
+        </div>
+    </div>
+
+    <div class="access-table-wrap">
+        <table class="access-table">
+            <thead>
+                <tr>
+                    <th>Fecha / Hora</th>
+                    <th>Usuario</th>
+                    <th>Evento</th>
+                    <th>IP</th>
+                    <th>Equipo / Navegador</th>
+                    <th>Resultado</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for r in rows %}
+                <tr>
+                    <td>
+                        <div class="access-date">
+                            <strong>{{ r.fecha or r.fecha_hora or '—' }}</strong>
+                            <span>{{ r.hora or '' }}</span>
+                        </div>
+                    </td>
+
+                    <td>
+                        <div class="access-user">
+                            <div class="access-avatar">
+                                {{ (r.usuario or r.usuario_nombre or '?')|string|first|upper }}
+                            </div>
+                            <strong>{{ r.usuario or r.usuario_nombre or '—' }}</strong>
+                        </div>
+                    </td>
+
+                    <td>
+                        {% if r.evento == 'LOGIN_EXITOSO' or r.accion == 'LOGIN_EXITOSO' %}
+                            <span class="access-event ok">
+                                <i class="fa-solid fa-right-to-bracket"></i>
+                                Login exitoso
+                            </span>
+                        {% elif r.evento == 'LOGIN_FALLIDO' or r.accion == 'LOGIN_FALLIDO' %}
+                            <span class="access-event fail">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                                Login fallido
+                            </span>
+                        {% elif r.evento == 'LOGOUT' or r.accion == 'LOGOUT' %}
+                            <span class="access-event logout">
+                                <i class="fa-solid fa-right-from-bracket"></i>
+                                Logout
+                            </span>
+                        {% else %}
+                            <span class="access-event other">
+                                <i class="fa-solid fa-circle-info"></i>
+                                {{ r.evento or r.accion or '—' }}
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <span class="access-ip">
+                            <i class="fa-solid fa-network-wired"></i>
+                            {{ r.ip or '—' }}
+                        </span>
+                    </td>
+
+                    <td>
+                        <div class="access-agent">
+                            {{ r.equipo or r.user_agent or r.navegador or '—' }}
+                        </div>
+                    </td>
+
+                    <td>
+                        {% if r.resultado == 'OK' %}
+                            <span class="access-result ok">OK</span>
+                        {% elif r.resultado == 'FALLIDO' or r.resultado == 'DENEGADO' %}
+                            <span class="access-result fail">{{ r.resultado }}</span>
+                        {% else %}
+                            <span class="access-result neutral">{{ r.resultado or '—' }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+
+                {% else %}
+                <tr>
+                    <td colspan="6">
+                        <div class="empty-box">
+                            <i class="fa-solid fa-inbox"></i>
+                            <p>No hay registros de ingresos o salidas.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</section>
+
+{% endblock %}

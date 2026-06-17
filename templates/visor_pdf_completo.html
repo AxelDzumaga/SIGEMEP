@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}PDF completo - SIGEMEP{% endblock %}
+{% block page_title %}Visor de PDF completo{% endblock %}
+
+{% block content %}
+
+<section class="pdf-full-header">
+    <div>
+        <span class="section-tag">
+            <i class="fa-solid fa-file-pdf"></i>
+            Visualización autorizada
+        </span>
+        <h1>{{ mem.nombre_archivo }}</h1>
+        <p>Vista completa del documento. Esta acción queda registrada en auditoría.</p>
+    </div>
+
+    <a href="/buscar" class="btn btn-outline">
+        <i class="fa-solid fa-arrow-left"></i>
+        Volver a búsqueda
+    </a>
+</section>
+
+<section class="pdf-full-card">
+    <div class="pdf-toolbar">
+        <div>
+            <strong><i class="fa-solid fa-eye"></i> PDF completo</strong>
+            <span>Visualización interna habilitada para ADMIN y JEFE.</span>
+        </div>
+        <div class="pdf-toolbar-badge">{{ user.rol }}</div>
+    </div>
+
+    <iframe class="pdf-frame" src="/pdf_completo_stream/{{ mem.id }}#toolbar=0&navpanes=0&scrollbar=1" title="PDF completo"></iframe>
+</section>
+
+{% endblock %}

@@ -1,0 +1,38 @@
+SIGEMEP — Ejecución en Windows
+===============================
+
+1) Abrir PowerShell en la carpeta del proyecto (SIGEMEP_APP).
+
+2) Crear entorno virtual:
+   python -m venv venv
+
+3) Activar:
+   venv\Scripts\activate
+
+4) Instalar dependencias:
+   pip install -r requirements.txt
+
+5) (Opcional) Carpeta de PDFs por variable de entorno si no usa la ruta por defecto:
+   set SIGEMEP_PDF_DIR=C:\ruta\a\BASE MEMORANDOS
+
+6) (Opcional) Secreto de sesión en producción:
+   set SIGEMEP_SESSION_SECRET=una-cadena-larga-y-aleatoria
+
+7) Iniciar el servidor (acceso desde otras PCs en la red):
+   uvicorn app:app --host 0.0.0.0 --port 8000
+
+8) En el servidor abrir:
+   http://localhost:8000
+
+9) Desde otras PCs:
+   http://IP_DEL_SERVIDOR:8000
+
+Usuario inicial administrador:
+- Usuario: admin
+- Contraseña: admin123
+- Debe cambiar la contraseña en el primer ingreso.
+
+Ruta por defecto de memorandos (config.py / variable SIGEMEP_PDF_DIR):
+C:\Users\SIGEMEP\Desktop\PROYECTO SIGEMEP\dist\SIGEMEP\BASE MEMORANDOS
+
+Tras el primer arranque, entre como admin, cambie la contraseña y use «Actualizar base PDF» en el panel para indexar los PDF.

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}{{ memorando.nombre_archivo }} · Reservados · SIGEMEP{% endblock %}
+{% block page_title %}Visor de Reservados{% endblock %}
+
+{% block head %}
+<style>
+.rv-hero { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+.rv-hero h1 { margin: 8px 0 0; color: #fff; font-size: 22px; font-weight: 950; word-break: break-word; }
+.rv-hero p { margin: 6px 0 0; color: #9ca3af; font-size: 12.5px; }
+.rv-frame { background: linear-gradient(145deg, rgba(18,24,28,.96), rgba(7,10,12,.99)); border: 1px solid rgba(255,255,255,.10); border-radius: 22px; padding: 18px; text-align: center; }
+.rv-frame img { max-width: 100%; border-radius: 10px; user-select: none; -webkit-user-select: none; }
+.rv-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 16px; }
+.rv-warning { margin-top: 16px; border-radius: 16px; padding: 12px 16px; background: rgba(255,115,0,.10); border: 1px solid rgba(255,115,0,.28); color: #ffcfaa; font-size: 12.5px; display: flex; gap: 10px; align-items: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="rv-hero">
+    <div>
+        <span class="section-tag"><i class="fa-solid fa-lock"></i> Documento reservado</span>
+        <h1>{{ memorando.nombre_archivo }}</h1>
+        <p>Página {{ pagina }} de {{ total_paginas }}</p>
+    </div>
+    <a href="javascript:history.back()" class="btn btn-outline">
+        <i class="fa-solid fa-arrow-left"></i> Volver
+    </a>
+</section>
+
+<section class="rv-frame">
+    <img src="/reservados/visor/{{ memorando.id }}/imagen/{{ pagina }}" alt="Página {{ pagina }}" draggable="false">
+
+    <div class="rv-nav">
+        {% if pagina > 1 %}
+        <a class="page-btn" href="/reservados/visor/{{ memorando.id }}?pagina={{ pagina - 1 }}"><i class="fa-solid fa-chevron-left"></i> Anterior</a>
+        {% endif %}
+        <span class="page-info">Página {{ pagina }} de {{ total_paginas }}</span>
+        {% if pagina < total_paginas %}
+        <a class="page-btn" href="/reservados/visor/{{ memorando.id }}?pagina={{ pagina + 1 }}">Siguiente <i class="fa-solid fa-chevron-right"></i></a>
+        {% endif %}
+    </div>
+</section>
+
+<div class="rv-warning">
+    <i class="fa-solid fa-shield-halved"></i>
+    <span>Esta imagen incluye marca de agua con usuario, rol, fecha, hora e IP. Toda visualización queda registrada. No está permitido descargar este documento.</span>
+</div>
+{% endblock %}

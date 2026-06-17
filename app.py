@@ -1575,6 +1575,54 @@ def reservados_resultados_get(
     })
 
 
+# ── RESERVADOS — VISOR SEGURO ──────────────────────────────────────
+
+@app.get("/reservados/visor/{mem_id}", response_class=HTMLResponse)
+def reservados_visor(mem_id: int, request: Request, user: dict = Depends(require_reservados), pagina: int = Query(1)):
+    require_password_ok(request, user)
+    with get_db() as conn:
+        m = conn.execute("SELECT * FROM reservados WHERE id = ? AND activo = 1", (mem_id,)).fetchone()
+        if not m:
+            raise HTTPException(404)
+        total_paginas = m["cantidad_paginas"] or 1
+        pagina = max(1, min(pagina, total_paginas))
+        registrar_auditoria(
+            conn,
+            "RESERVADO_VISOR_ABIERTO",
+            usuario_id=user["id"],
+            memorando_id=mem_id,
+            detalle={"archivo": m["nombre_archivo"]},
+            ip=client_ip(request),
+            equipo=ua(request),
+            resultado="OK",
+        )
+        memorando = dict(m)
+    return templates.TemplateResponse("reservados_visor.html", {
+        "request": request,
+        "user": user,
+        "memorando": memorando,
+        "pagina": pagina,
+        "total_paginas": total_paginas,
+    })
+
+
+@app.get("/reservados/visor/{mem_id}/imagen/{n}")
+def reservados_visor_imagen(mem_id: int, n: int, request: Request, user: dict = Depends(require_reservados)):
+    with get_db() as conn:
+        m = conn.execute("SELECT * FROM reservados WHERE id = ? AND activo = 1", (mem_id,)).fetchone()
+        if not m:
+            raise HTTPException(404)
+        total_paginas = m["cantidad_paginas"] or 1
+        if n < 1 or n > total_paginas:
+            raise HTTPException(404)
+        ruta = ruta_absoluta_segura_reservados(m["ruta_archivo"], conn)
+        if not ruta:
+            raise HTTPException(404)
+        preview = Path(m["primera_hoja_img"]) if m["primera_hoja_img"] else None
+        img_bytes = imagen_pagina_con_marca(ruta, n - 1, preview, user["usuario"], user["rol"], client_ip(request))
+    return Response(img_bytes, media_type="image/png")
+
+
 @app.get("/admin/auditoria", response_class=HTMLResponse)
 def admin_auditoria(request: Request, user: dict = Depends(require_admin), filtro_usuario: Optional[int] = Query(None), filtro_accion: Optional[str] = Query(None), desde: Optional[str] = Query(None), hasta: Optional[str] = Query(None), filtro_memorando: Optional[int] = Query(None), filtro_resultado: Optional[str] = Query(None)):
     with get_db() as conn:

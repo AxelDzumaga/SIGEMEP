@@ -117,6 +117,23 @@ def require_roles(*roles: str):
     return dep
 
 
+def require_reservados(request: Request, user: Annotated[dict, Depends(require_login)]) -> dict[str, Any]:
+    require_password_ok(request, user)
+    if user["rol"] != "ADMIN" and not user.get("permiso_reservados"):
+        with get_db() as conn:
+            registrar_auditoria(
+                conn,
+                "ACCESO_DENEGADO",
+                usuario_id=user["id"],
+                detalle=f"Ruta: {request.url.path}",
+                ip=client_ip(request),
+                equipo=ua(request),
+                resultado="DENEGADO",
+            )
+        raise HTTPException(status_code=status.HTTP_303_SEE_OTHER, headers={"Location": "/acceso_denegado"})
+    return user
+
+
 def require_admin(request: Request, user: Annotated[dict[str, Any], Depends(require_login)]) -> dict[str, Any]:
     require_password_ok(request, user)
     if user["rol"] != "ADMIN":

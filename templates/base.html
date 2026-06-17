@@ -30,6 +30,9 @@
 <a href="/dashboard/brigada" class="nav-item"><i class="fa-solid fa-house"></i><span>Inicio</span></a>
 <a href="/buscar" class="nav-item"><i class="fa-solid fa-magnifying-glass"></i><span>Buscar memorandos</span></a>
 {% endif %}
+{% if user.rol == 'ADMIN' or user.permiso_reservados %}
+<a href="/reservados" class="nav-item"><i class="fa-solid fa-lock"></i><span>Reservados</span></a>
+{% endif %}
 <a href="/cambiar_password" class="nav-item"><i class="fa-solid fa-key"></i><span>Cambiar contraseña</span></a>
 </nav>
 </div>

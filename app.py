@@ -1129,6 +1129,26 @@ async def admin_cambiar_rol(request: Request, uid: int, user: dict = Depends(req
     return RedirectResponse("/admin/usuarios", status_code=302)
 
 
+@app.post("/admin/usuario/{uid}/permiso_reservados")
+def admin_usuario_permiso_reservados(uid: int, request: Request, user: dict = Depends(require_admin)):
+    with get_db() as conn:
+        row = conn.execute("SELECT usuario, permiso_reservados FROM usuarios WHERE id = ?", (uid,)).fetchone()
+        if not row:
+            raise HTTPException(404)
+        nuevo_valor = 0 if row["permiso_reservados"] else 1
+        conn.execute("UPDATE usuarios SET permiso_reservados = ? WHERE id = ?", (nuevo_valor, uid))
+        registrar_auditoria(
+            conn,
+            "PERMISO_RESERVADOS_OTORGADO" if nuevo_valor else "PERMISO_RESERVADOS_REVOCADO",
+            usuario_id=user["id"],
+            detalle={"usuario_afectado": row["usuario"], "uid": uid},
+            ip=client_ip(request),
+            equipo=ua(request),
+            resultado="OK",
+        )
+    request.session["sigemep_flash"] = "Permiso de Reservados actualizado."
+    return RedirectResponse("/admin/usuarios", status_code=302)
+
 
 @app.post("/admin/usuario/{uid}/password_temp")
 def admin_password_temp(request: Request, uid: int, user: dict = Depends(require_admin)):

@@ -32,9 +32,12 @@ from services.auth_service import (
 from services.db import get_config, get_db, init_db, set_config
 from services.pdf_service import (
     carpeta_pdf_actual,
+    carpeta_reservados_actual,
+    imagen_pagina_con_marca,
     imagen_primera_hoja_con_marca,
     indexar_memorandos,
     ruta_absoluta_segura,
+    ruta_absoluta_segura_reservados,
 )
 from services.search_service import buscar_memorandos
 from services.memo_creator import generar_pdf_memorando, nombre_archivo_memorando
@@ -52,6 +55,9 @@ ROLES_DESCARGA_PDF = frozenset({"ADMIN", "JEFE"})
 
 INDEX_JOBS: dict[str, dict[str, Any]] = {}
 INDEX_JOBS_LOCK = threading.Lock()
+
+RESERVADOS_INDEX_JOBS: dict[str, dict[str, Any]] = {}
+RESERVADOS_INDEX_JOBS_LOCK = threading.Lock()
 
 
 @app.on_event("startup")
@@ -192,6 +198,49 @@ def _index_worker(job_id: str, admin_id: int, ip: str, equipo: str, force: bool)
         except Exception:
             pass
         _set_index_job(job_id, {"estado": "error", "mensaje": str(exc)[:500]})
+
+
+def _set_reservados_index_job(job_id: str, data: dict[str, Any]) -> None:
+    with RESERVADOS_INDEX_JOBS_LOCK:
+        job = RESERVADOS_INDEX_JOBS.setdefault(job_id, {})
+        job.update(data)
+        job["actualizado_en"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _get_reservados_index_job(job_id: str) -> dict[str, Any]:
+    with RESERVADOS_INDEX_JOBS_LOCK:
+        return dict(RESERVADOS_INDEX_JOBS.get(job_id, {}))
+
+
+def _index_reservados_worker(job_id: str, admin_id: int, ip: str, equipo: str, force: bool) -> None:
+    modo = "completa" if force else "rapida"
+    accion_ini = "REINDEXACION_RESERVADOS_COMPLETA_INICIADA" if force else "INDEXACION_RESERVADOS_RAPIDA_INICIADA"
+    accion_fin = "REINDEXACION_RESERVADOS_COMPLETA_FINALIZADA" if force else "INDEXACION_RESERVADOS_RAPIDA_FINALIZADA"
+    try:
+        _set_reservados_index_job(job_id, {
+            "estado": "preparando", "modo": modo, "total": 0, "procesados": 0,
+            "sin_cambios": 0, "nuevos": 0, "actualizados": 0,
+            "no_encontrados": 0, "errores": 0, "archivo_actual": "",
+            "mensaje": "Preparando indexación...",
+        })
+        with get_db() as conn:
+            carpeta = carpeta_reservados_actual(conn)
+            registrar_auditoria(conn, accion_ini, usuario_id=admin_id, detalle={"job_id": job_id, "carpeta": str(carpeta)}, ip=ip, equipo=equipo, resultado="OK")
+
+            def progress(data: dict[str, Any]) -> None:
+                _set_reservados_index_job(job_id, data)
+
+            stats = indexar_memorandos(conn, admin_id, progress_callback=progress, force=force, tabla="reservados", carpeta=carpeta)
+            registrar_auditoria(conn, accion_fin, usuario_id=admin_id, detalle={"job_id": job_id, **stats}, ip=ip, equipo=equipo, resultado="OK")
+        _set_reservados_index_job(job_id, {"estado": "finalizado", "mensaje": "Indexación finalizada."})
+    except Exception as exc:
+        logger.error("Error en indexación de reservados %s: %s\n%s", job_id, exc, traceback.format_exc())
+        try:
+            with get_db() as conn:
+                registrar_auditoria(conn, "ERROR_INDEXACION_RESERVADOS", usuario_id=admin_id, detalle={"job_id": job_id, "error": str(exc)[:500]}, ip=ip, equipo=equipo, resultado="ERROR")
+        except Exception:
+            pass
+        _set_reservados_index_job(job_id, {"estado": "error", "mensaje": str(exc)[:500]})
 
 
 @app.exception_handler(HTTPException)
@@ -1377,6 +1426,39 @@ def admin_reindexar_iniciar(request: Request, user: dict = Depends(require_admin
 @app.get("/admin/reindexar/estado/{job_id}")
 def admin_reindexar_estado(job_id: str, request: Request, user: dict = Depends(require_admin)):
     job = _get_index_job(job_id)
+    if not job:
+        return JSONResponse({"estado": "no_encontrado", "mensaje": "Tarea no encontrada."}, status_code=404)
+    return JSONResponse({"job_id": job_id, **job})
+
+
+# ── RESERVADOS — INDEXACIÓN (ADMIN) ───────────────────────────────
+
+@app.get("/admin/reservados/reindexar", response_class=HTMLResponse)
+def admin_reservados_reindexar_get(request: Request, user: dict = Depends(require_admin)):
+    with get_db() as conn:
+        reservados_dir = get_config(conn, "reservados_dir", str(carpeta_reservados_actual(conn)))
+        n_reservados = conn.execute("SELECT COUNT(*) FROM reservados WHERE activo = 1").fetchone()[0]
+        last = conn.execute("SELECT * FROM auditoria WHERE accion IN ('INDEXACION_RESERVADOS_RAPIDA_FINALIZADA','REINDEXACION_RESERVADOS_COMPLETA_FINALIZADA') ORDER BY fecha_hora DESC LIMIT 1").fetchone()
+    return templates.TemplateResponse("reservados_reindexar.html", {"request": request, "user": user, "reservados_dir": reservados_dir, "n_reservados": n_reservados, "ultima": dict(last) if last else None})
+
+
+@app.post("/admin/reservados/reindexar/iniciar")
+def admin_reservados_reindexar_iniciar(request: Request, user: dict = Depends(require_admin), modo: str = Query("rapida")):
+    force = modo == "completa"
+    with RESERVADOS_INDEX_JOBS_LOCK:
+        for existing_id, job in RESERVADOS_INDEX_JOBS.items():
+            if job.get("estado") in {"preparando", "ejecutando"}:
+                return JSONResponse({"job_id": existing_id, **dict(job)})
+    job_id = uuid.uuid4().hex[:12]
+    _set_reservados_index_job(job_id, {"estado": "preparando", "modo": "completa" if force else "rapida", "total": 0, "procesados": 0, "sin_cambios": 0, "nuevos": 0, "actualizados": 0, "no_encontrados": 0, "errores": 0, "archivo_actual": "", "mensaje": "Iniciando tarea..."})
+    t = threading.Thread(target=_index_reservados_worker, args=(job_id, user["id"], client_ip(request), ua(request), force), daemon=True)
+    t.start()
+    return JSONResponse({"job_id": job_id, **_get_reservados_index_job(job_id)})
+
+
+@app.get("/admin/reservados/reindexar/estado/{job_id}")
+def admin_reservados_reindexar_estado(job_id: str, request: Request, user: dict = Depends(require_admin)):
+    job = _get_reservados_index_job(job_id)
     if not job:
         return JSONResponse({"estado": "no_encontrado", "mensaje": "Tarea no encontrada."}, status_code=404)
     return JSONResponse({"job_id": job_id, **job})

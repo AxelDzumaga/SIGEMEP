@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+
+{% block title %}Indexación de Reservados · SIGEMEP{% endblock %}
+{% block page_title %}Indexación de Reservados{% endblock %}
+
+{% block content %}
+
+<section class="index-hero">
+    <div>
+        <span class="section-tag">
+            <i class="fa-solid fa-lock"></i>
+            Base reservada
+        </span>
+
+        <h1>Indexación de Reservados</h1>
+
+        <p>
+            Actualización rápida y reindexación completa de la carpeta de informes reservados.
+        </p>
+    </div>
+
+    <a href="/dashboard/admin" class="btn btn-outline">
+        <i class="fa-solid fa-arrow-left"></i>
+        Volver al panel
+    </a>
+</section>
+
+<section class="index-grid">
+
+    <article class="index-card">
+        <div class="index-card-head">
+            <div class="index-icon">
+                <i class="fa-solid fa-folder-open"></i>
+            </div>
+
+            <div>
+                <h2>Carpeta de Reservados</h2>
+                <p>Ruta donde SIGEMEP busca los informes reservados.</p>
+            </div>
+        </div>
+
+        <div class="index-current-path">
+            <i class="fa-solid fa-circle-info"></i>
+            <span>Ruta definida:</span>
+            <strong>{{ reservados_dir or 'No configurada' }}</strong>
+        </div>
+
+        {% if ultima %}
+        <div class="index-last-run">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+            <div>
+                <span>Última indexación</span>
+                <strong>{{ ultima.fecha_hora or ultima.creado_en or '—' }}</strong>
+            </div>
+        </div>
+        {% endif %}
+    </article>
+
+    <article class="index-card index-count-card">
+        <div class="index-count-icon">
+            <i class="fa-solid fa-database"></i>
+        </div>
+
+        <div>
+            <strong>{{ n_reservados or 0 }}</strong>
+            <span>Indexados activos</span>
+            <p>Informes reservados disponibles para búsqueda.</p>
+        </div>
+    </article>
+
+</section>
+
+<section class="index-card">
+    <div class="index-card-head">
+        <div class="index-icon">
+            <i class="fa-solid fa-rotate"></i>
+        </div>
+
+        <div>
+            <h2>Actualizar base de Reservados</h2>
+            <p>
+                La actualización rápida procesa PDFs nuevos o modificados. La reindexación completa reprocesa toda la carpeta.
+            </p>
+        </div>
+    </div>
+
+    <div class="index-actions">
+
+        <form method="post" action="/admin/reservados/reindexar/iniciar?modo=rapida">
+            <button id="btn-fast" type="submit" class="btn btn-primary">
+                <i class="fa-solid fa-bolt"></i>
+                Actualización rápida
+            </button>
+        </form>
+
+        <form method="post" action="/admin/reservados/reindexar/iniciar?modo=completa">
+            <button id="btn-full" type="submit" class="btn btn-danger">
+                <i class="fa-solid fa-arrows-rotate"></i>
+                Reindexación completa
+            </button>
+        </form>
+
+    </div>
+
+    <div class="index-progress-panel">
+        <div class="index-progress-top">
+            <div>
+                <strong id="idx-estado">Preparado para indexar</strong>
+                <span id="idx-porcentaje">0%</span>
+            </div>
+        </div>
+
+        <div class="index-progress-bar">
+            <div id="idx-barra" style="width: 0%;"></div>
+        </div>
+
+        <div class="index-progress-grid">
+            <div>
+                <span>Total</span>
+                <strong id="idx-total">0</strong>
+            </div>
+
+            <div>
+                <span>Procesados</span>
+                <strong id="idx-procesados">0</strong>
+            </div>
+
+            <div>
+                <span>Sin cambios</span>
+                <strong id="idx-sin-cambios">0</strong>
+            </div>
+
+            <div>
+                <span>Nuevos</span>
+                <strong id="idx-nuevos">0</strong>
+            </div>
+
+            <div>
+                <span>Actualizados</span>
+                <strong id="idx-actualizados">0</strong>
+            </div>
+
+            <div>
+                <span>Errores</span>
+                <strong id="idx-errores">0</strong>
+            </div>
+        </div>
+
+        <div class="index-current-file">
+            <span>Archivo actual</span>
+            <strong id="idx-archivo">—</strong>
+        </div>
+    </div>
+
+    <div id="idx-mensaje" class="index-message" style="display: none;">
+        <i class="fa-solid fa-circle-info"></i>
+        <span></span>
+    </div>
+
+    <div class="index-warning">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>No cierre esta ventana mientras se indexan los PDFs.</span>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const forms = document.querySelectorAll('.index-actions form');
+    const btnFast = document.getElementById('btn-fast');
+    const btnFull = document.getElementById('btn-full');
+
+    const estado = document.getElementById('idx-estado');
+    const porcentaje = document.getElementById('idx-porcentaje');
+    const barra = document.getElementById('idx-barra');
+
+    const total = document.getElementById('idx-total');
+    const procesados = document.getElementById('idx-procesados');
+    const sinCambios = document.getElementById('idx-sin-cambios');
+    const nuevos = document.getElementById('idx-nuevos');
+    const actualizados = document.getElementById('idx-actualizados');
+    const errores = document.getElementById('idx-errores');
+    const archivo = document.getElementById('idx-archivo');
+
+    const mensajeBox = document.getElementById('idx-mensaje');
+    const mensajeText = mensajeBox ? mensajeBox.querySelector('span') : null;
+
+    function setMensaje(texto) {
+        if (!mensajeBox || !mensajeText) return;
+        mensajeText.textContent = texto || '';
+        mensajeBox.style.display = texto ? 'flex' : 'none';
+    }
+
+    function setBotones(disabled) {
+        if (btnFast) btnFast.disabled = disabled;
+        if (btnFull) btnFull.disabled = disabled;
+    }
+
+    function val(data, keys, fallback) {
+        for (const k of keys) {
+            if (data && data[k] !== undefined && data[k] !== null) {
+                return data[k];
+            }
+        }
+        return fallback;
+    }
+
+    function renderEstado(data) {
+        const pct = Number(val(data, ['porcentaje', 'percent', 'pct'], 0)) || 0;
+
+        estado.textContent = val(data, ['estado', 'status', 'mensaje_estado'], 'Procesando...');
+        porcentaje.textContent = pct + '%';
+        barra.style.width = Math.max(0, Math.min(100, pct)) + '%';
+
+        total.textContent = val(data, ['total'], 0);
+        procesados.textContent = val(data, ['procesados', 'processed'], 0);
+        sinCambios.textContent = val(data, ['sin_cambios', 'sinCambios', 'unchanged'], 0);
+        nuevos.textContent = val(data, ['nuevos', 'new'], 0);
+        actualizados.textContent = val(data, ['actualizados', 'updated'], 0);
+        errores.textContent = val(data, ['errores', 'errors'], 0);
+        archivo.textContent = val(data, ['archivo_actual', 'archivo', 'current_file'], '—');
+
+        const msg = val(data, ['mensaje', 'message'], '');
+        setMensaje(msg);
+
+        const finalizado = Boolean(val(data, ['finalizado', 'done', 'terminado'], false));
+        const status = String(val(data, ['estado', 'status'], '')).toLowerCase();
+
+        if (
+            finalizado ||
+            status.includes('finalizado') ||
+            status.includes('completado') ||
+            status.includes('terminado') ||
+            status.includes('error')
+        ) {
+            setBotones(false);
+            return true;
+        }
+
+        return false;
+    }
+
+    async function poll(jobId) {
+        try {
+            const resp = await fetch('/admin/reservados/reindexar/estado/' + encodeURIComponent(jobId), {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!resp.ok) {
+                setMensaje('No se pudo consultar el estado de la indexación.');
+                setBotones(false);
+                return;
+            }
+
+            const data = await resp.json();
+            const finished = renderEstado(data);
+
+            if (!finished) {
+                setTimeout(function () {
+                    poll(jobId);
+                }, 1000);
+            }
+        } catch (e) {
+            setMensaje('Error consultando el estado de indexación.');
+            setBotones(false);
+        }
+    }
+
+    forms.forEach(function (form) {
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            setBotones(true);
+            setMensaje('');
+            estado.textContent = 'Iniciando indexación...';
+            porcentaje.textContent = '0%';
+            barra.style.width = '0%';
+
+            try {
+                const resp = await fetch(form.action, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                const contentType = resp.headers.get('content-type') || '';
+
+                if (contentType.includes('application/json')) {
+                    const data = await resp.json();
+
+                    const jobId = val(data, ['job_id', 'jobId', 'id'], null);
+
+                    if (jobId) {
+                        estado.textContent = 'Indexación iniciada...';
+                        poll(jobId);
+                        return;
+                    }
+
+                    renderEstado(data);
+                    setBotones(false);
+                    return;
+                }
+
+                if (resp.redirected) {
+                    window.location.href = resp.url;
+                    return;
+                }
+
+                if (resp.ok) {
+                    estado.textContent = 'Indexación iniciada.';
+                    setMensaje('La indexación fue iniciada. Actualice la pantalla si no ve progreso.');
+                    setBotones(false);
+                    return;
+                }
+
+                setMensaje('No se pudo iniciar la indexación.');
+                setBotones(false);
+
+            } catch (e) {
+                setMensaje('Error iniciando la indexación.');
+                setBotones(false);
+            }
+        });
+    });
+})();
+</script>
+{% endblock %}

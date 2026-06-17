@@ -1464,6 +1464,117 @@ def admin_reservados_reindexar_estado(job_id: str, request: Request, user: dict 
     return JSONResponse({"job_id": job_id, **job})
 
 
+# ── RESERVADOS — BÚSQUEDA ──────────────────────────────────────────
+
+@app.get("/reservados", response_class=HTMLResponse)
+def reservados_get(request: Request, user: dict = Depends(require_reservados)):
+    return templates.TemplateResponse("reservados_buscar.html", {"request": request, "user": user})
+
+
+@app.post("/reservados")
+def reservados_post(
+    request: Request,
+    q: str = Form(""),
+    campo: str = Form("todo"),
+    fecha_desde: str = Form(""),
+    fecha_hasta: str = Form(""),
+    paginas_min: int = Form(0),
+    paginas_max: int = Form(0),
+    user: dict = Depends(require_reservados),
+):
+    require_password_ok(request, user)
+    q = (q or "").strip()
+    hay_filtros = bool((campo and campo != "todo") or fecha_desde or fecha_hasta or paginas_min or paginas_max)
+    if not q and not hay_filtros:
+        return RedirectResponse("/reservados", status_code=302)
+    params: dict[str, str] = {"q": q, "page": "1"}
+    if campo and campo != "todo":
+        params["campo"] = campo
+    if fecha_desde:
+        params["fecha_desde"] = fecha_desde
+    if fecha_hasta:
+        params["fecha_hasta"] = fecha_hasta
+    if paginas_min:
+        params["paginas_min"] = str(paginas_min)
+    if paginas_max:
+        params["paginas_max"] = str(paginas_max)
+    return RedirectResponse(f"/reservados/resultados?{urlencode(params)}", status_code=302)
+
+
+@app.get("/reservados/resultados", response_class=HTMLResponse)
+def reservados_resultados_get(
+    request: Request,
+    user: dict = Depends(require_reservados),
+    q: str = Query(""),
+    page: int = Query(1),
+    campo: str = Query("todo"),
+    fecha_desde: str = Query(""),
+    fecha_hasta: str = Query(""),
+    paginas_min: int = Query(0),
+    paginas_max: int = Query(0),
+):
+    require_password_ok(request, user)
+    q = (q or "").strip()
+    hay_filtros = bool((campo and campo != "todo") or fecha_desde or fecha_hasta or paginas_min or paginas_max)
+    if not q and not hay_filtros:
+        return RedirectResponse("/reservados", status_code=302)
+
+    page_size = 20
+    page = max(1, int(page or 1))
+
+    todos = list(buscar_memorandos(
+        q,
+        limit=5000,
+        campo=campo or "todo",
+        fecha_desde=fecha_desde or "",
+        fecha_hasta=fecha_hasta or "",
+        paginas_min=paginas_min or 0,
+        paginas_max=paginas_max or 0,
+        tabla="reservados",
+    ))
+
+    total = len(todos)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    page = min(page, total_pages)
+    start = (page - 1) * page_size
+    resultados = todos[start:start + page_size]
+
+    if page == 1:
+        try:
+            with get_db() as conn:
+                registrar_busqueda(conn, user["id"], q, total, client_ip(request))
+                registrar_auditoria(conn, "RESERVADO_BUSQUEDA_REALIZADA", usuario_id=user["id"], detalle={"q": q, "cantidad_resultados": total, "paginacion": True}, ip=client_ip(request), equipo=ua(request), resultado="OK")
+        except Exception:
+            pass
+
+    filtros_params: dict[str, str] = {}
+    if campo and campo != "todo":
+        filtros_params["campo"] = campo
+    if fecha_desde:
+        filtros_params["fecha_desde"] = fecha_desde
+    if fecha_hasta:
+        filtros_params["fecha_hasta"] = fecha_hasta
+    if paginas_min:
+        filtros_params["paginas_min"] = str(paginas_min)
+    if paginas_max:
+        filtros_params["paginas_max"] = str(paginas_max)
+    filtros_url = ("&" + urlencode(filtros_params)) if filtros_params else ""
+
+    return templates.TemplateResponse("reservados_resultados.html", {
+        "request": request, "user": user, "q": q,
+        "resultados": resultados, "total": total, "page": page,
+        "page_size": page_size, "total_pages": total_pages,
+        "page_numbers": _sigemep_page_window(page, total_pages),
+        "campo": campo or "todo",
+        "fecha_desde": fecha_desde or "",
+        "fecha_hasta": fecha_hasta or "",
+        "paginas_min": paginas_min or 0,
+        "paginas_max": paginas_max or 0,
+        "filtros_url": filtros_url,
+        "filtros_activos": bool(filtros_params),
+    })
+
+
 @app.get("/admin/auditoria", response_class=HTMLResponse)
 def admin_auditoria(request: Request, user: dict = Depends(require_admin), filtro_usuario: Optional[int] = Query(None), filtro_accion: Optional[str] = Query(None), desde: Optional[str] = Query(None), hasta: Optional[str] = Query(None), filtro_memorando: Optional[int] = Query(None), filtro_resultado: Optional[str] = Query(None)):
     with get_db() as conn:

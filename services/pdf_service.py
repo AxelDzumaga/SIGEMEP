@@ -12,7 +12,7 @@ _PDF_TIMEOUT = 120  # segundos máximo por PDF antes de considerarlo colgado
 import fitz  # PyMuPDF
 from PIL import Image, ImageDraw, ImageFont
 
-from config import PDF_BASE_DIR, PREVIEWS_DIR
+from config import PDF_BASE_DIR, PREVIEWS_DIR, RESERVADOS_BASE_DIR
 from services.db import rebuild_fts
 
 
@@ -41,6 +41,23 @@ def carpeta_pdf_actual(conn=None) -> Path:
     return Path(PDF_BASE_DIR)
 
 
+def carpeta_reservados_actual(conn=None) -> Path:
+    """
+    Devuelve la carpeta configurada de Reservados.
+    Si existe config.reservados_dir en la base, usa esa ruta.
+    Si no existe, usa RESERVADOS_BASE_DIR de config.py.
+    """
+    try:
+        if conn is not None:
+            row = conn.execute("SELECT valor FROM configuracion WHERE clave = 'reservados_dir'").fetchone()
+            if row and row["valor"]:
+                return Path(row["valor"])
+    except Exception:
+        pass
+
+    return Path(RESERVADOS_BASE_DIR)
+
+
 def ruta_absoluta_segura(ruta_relativa: str, conn=None) -> Optional[Path]:
     """
     Resuelve una ruta de PDF de forma segura.
@@ -49,6 +66,35 @@ def ruta_absoluta_segura(ruta_relativa: str, conn=None) -> Optional[Path]:
     - rutas absolutas, siempre que estén dentro de la carpeta PDF configurada.
     """
     base = carpeta_pdf_actual(conn).resolve()
+
+    if not ruta_relativa:
+        return None
+
+    raw = Path(str(ruta_relativa))
+
+    if raw.is_absolute():
+        candidate = raw.resolve()
+    else:
+        rel = raw.as_posix().lstrip("/").replace("\\", "/")
+        candidate = (base / rel).resolve()
+
+    try:
+        candidate.relative_to(base)
+    except ValueError:
+        return None
+
+    return candidate if candidate.is_file() else None
+
+
+def ruta_absoluta_segura_reservados(ruta_relativa: str, conn=None) -> Optional[Path]:
+    """
+    Resuelve una ruta de Reservados de forma segura, igual que ruta_absoluta_segura
+    pero acotada siempre a la carpeta de Reservados configurada (nunca a la de
+    memorandos). Función separada a propósito: app.py define su propia función
+    local llamada ruta_absoluta_segura que sobreescribe la importada desde este
+    módulo, así que reutilizarla con un parámetro extra no sería seguro.
+    """
+    base = carpeta_reservados_actual(conn).resolve()
 
     if not ruta_relativa:
         return None
@@ -157,8 +203,9 @@ def _dibujar_marca_agua(
     return Image.alpha_composite(rgba, overlay).convert("RGB")
 
 
-def imagen_primera_hoja_con_marca(
+def imagen_pagina_con_marca(
     ruta_pdf: Path,
+    num_pagina: int,
     ruta_preview_base: Optional[Path],
     usuario: str,
     rol: str,
@@ -166,17 +213,18 @@ def imagen_primera_hoja_con_marca(
     cuando: Optional[datetime] = None,
 ) -> bytes:
     """
-    Devuelve PNG de primera hoja con marca de agua original.
-    Usa preview cache si existe; si no, renderiza directamente desde PDF.
+    Devuelve PNG de la página `num_pagina` (0-indexada) con marca de agua.
+    La página 0 puede usar el preview cacheado; el resto siempre se renderiza
+    directo del PDF (no se cachea en disco).
     """
     cuando = cuando or datetime.now()
 
-    if ruta_preview_base and ruta_preview_base.is_file():
+    if num_pagina == 0 and ruta_preview_base and ruta_preview_base.is_file():
         img = Image.open(ruta_preview_base).convert("RGB")
     else:
         doc = fitz.open(ruta_pdf)
         try:
-            page = doc.load_page(0)
+            page = doc.load_page(num_pagina)
             mat = fitz.Matrix(2.0, 2.0)
             pix = page.get_pixmap(matrix=mat, alpha=False)
             img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
@@ -196,6 +244,18 @@ def imagen_primera_hoja_con_marca(
     return buf.getvalue()
 
 
+def imagen_primera_hoja_con_marca(
+    ruta_pdf: Path,
+    ruta_preview_base: Optional[Path],
+    usuario: str,
+    rol: str,
+    ip: str,
+    cuando: Optional[datetime] = None,
+) -> bytes:
+    """Devuelve PNG de primera hoja con marca de agua. Usa preview cache si existe."""
+    return imagen_pagina_con_marca(ruta_pdf, 0, ruta_preview_base, usuario, rol, ip, cuando)
+
+
 def _file_fingerprint(path: Path) -> tuple[int, int]:
     """Huella simple por tamaño y fecha de modificación."""
     st = path.stat()
@@ -210,17 +270,27 @@ def _safe_progress(progress_callback: Optional[Callable[[dict[str, Any]], None]]
             pass
 
 
-def _ensure_memorando_columns(conn) -> None:
+_TABLAS_INDEXABLES = {
+    "memorandos": "memorandos_fts",
+    "reservados": "reservados_fts",
+}
+
+
+def _validar_tabla_indexable(tabla: str) -> str:
+    if tabla not in _TABLAS_INDEXABLES:
+        raise ValueError(f"Tabla no permitida para indexación: {tabla}")
+    return tabla
+
+
+def _ensure_memorando_columns(conn, tabla: str = "memorandos") -> None:
     """
-    Asegura columnas usadas por indexación incremental.
+    Asegura columnas usadas por indexación incremental en la tabla indicada.
     Si ya existen, ignora el error.
     """
-    for sql in [
-        "ALTER TABLE memorandos ADD COLUMN tamanio_bytes INTEGER",
-        "ALTER TABLE memorandos ADD COLUMN mtime INTEGER",
-    ]:
+    tabla = _validar_tabla_indexable(tabla)
+    for columna_sql in ["tamanio_bytes INTEGER", "mtime INTEGER"]:
         try:
-            conn.execute(sql)
+            conn.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna_sql}")
         except Exception:
             pass
 
@@ -247,16 +317,21 @@ def indexar_memorandos(
     admin_id: Optional[int] = None,
     progress_callback: Optional[Callable[[dict[str, Any]], None]] = None,
     force: bool = False,
+    tabla: str = "memorandos",
+    carpeta: Optional[Path] = None,
 ) -> dict[str, int]:
     """
-    Escanea la carpeta PDF configurada y actualiza tabla memorandos.
+    Escanea la carpeta configurada y actualiza la tabla correspondiente
+    (memorandos o reservados, según `tabla`).
 
     force=False:
         Actualización rápida. Si tamaño y modificación no cambiaron, no reextrae.
     force=True:
         Reindexación completa. Reprocesa todos los PDFs.
     """
-    base = carpeta_pdf_actual(conn).resolve()
+    tabla = _validar_tabla_indexable(tabla)
+    tabla_fts = _TABLAS_INDEXABLES[tabla]
+    base = (carpeta if carpeta is not None else carpeta_pdf_actual(conn)).resolve()
 
     if not base.is_dir():
         stats = {
@@ -277,7 +352,7 @@ def indexar_memorandos(
         })
         return stats
 
-    _ensure_memorando_columns(conn)
+    _ensure_memorando_columns(conn, tabla=tabla)
 
     pdfs: list[Path] = []
     for root, _, files in os.walk(base):
@@ -313,7 +388,7 @@ def indexar_memorandos(
                 size, mtime = _file_fingerprint(abs_path)
 
                 row = conn.execute(
-                    "SELECT id, tamanio_bytes, mtime FROM memorandos WHERE ruta_archivo = ?",
+                    f"SELECT id, tamanio_bytes, mtime FROM {tabla} WHERE ruta_archivo = ?",
                     (rel,)
                 ).fetchone()
 
@@ -326,12 +401,12 @@ def indexar_memorandos(
                     and row["mtime"] == mtime
                 ):
                     conn.execute(
-                        "UPDATE memorandos SET activo = 1 WHERE id = ?",
+                        f"UPDATE {tabla} SET activo = 1 WHERE id = ?",
                         (row["id"],)
                     )
                     sin_cambios += 1
                 else:
-                    preview_name = f"m_{hashlib.md5(rel.encode('utf-8')).hexdigest()[:16]}.png"
+                    preview_name = f"{tabla[:1]}_{hashlib.md5(rel.encode('utf-8')).hexdigest()[:16]}.png"
                     preview_path = PREVIEWS_DIR / preview_name
 
                     future = executor.submit(_procesar_pdf_contenido, abs_path, preview_path)
@@ -356,8 +431,8 @@ def indexar_memorandos(
 
                     if row:
                         conn.execute(
-                            """
-                            UPDATE memorandos SET
+                            f"""
+                            UPDATE {tabla} SET
                                 nombre_archivo = ?,
                                 texto_extraido = ?,
                                 cantidad_paginas = ?,
@@ -381,8 +456,8 @@ def indexar_memorandos(
                         actualizados += 1
                     else:
                         conn.execute(
-                            """
-                            INSERT INTO memorandos (
+                            f"""
+                            INSERT INTO {tabla} (
                                 nombre_archivo,
                                 ruta_archivo,
                                 texto_extraido,
@@ -429,10 +504,10 @@ def indexar_memorandos(
 
     no_encontrados = 0
     try:
-        rows = conn.execute("SELECT id, ruta_archivo FROM memorandos").fetchall()
+        rows = conn.execute(f"SELECT id, ruta_archivo FROM {tabla}").fetchall()
         for row in rows:
             if row["ruta_archivo"] not in vistos_rel:
-                conn.execute("UPDATE memorandos SET activo = 0 WHERE id = ?", (row["id"],))
+                conn.execute(f"UPDATE {tabla} SET activo = 0 WHERE id = ?", (row["id"],))
                 no_encontrados += 1
     except Exception:
         pass
@@ -448,7 +523,7 @@ def indexar_memorandos(
     }
 
     try:
-        rebuild_fts(conn)
+        rebuild_fts(conn, tabla_fts=tabla_fts)
     except Exception:
         pass
 

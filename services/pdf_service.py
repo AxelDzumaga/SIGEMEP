@@ -429,10 +429,16 @@ def indexar_memorandos(
                     and row["tamanio_bytes"] == size
                     and row["mtime"] == mtime
                 ):
-                    conn.execute(
-                        f"UPDATE {tabla} SET activo = 1 WHERE id = ?",
-                        (row["id"],)
-                    )
+                    if tabla == "memorandos":
+                        conn.execute(
+                            f"UPDATE {tabla} SET activo = 1, fecha_hecho = ? WHERE id = ?",
+                            (extraer_fecha_hecho(abs_path.name), row["id"])
+                        )
+                    else:
+                        conn.execute(
+                            f"UPDATE {tabla} SET activo = 1 WHERE id = ?",
+                            (row["id"],)
+                        )
                     sin_cambios += 1
                 else:
                     preview_name = f"{tabla[:1]}_{hashlib.md5(rel.encode('utf-8')).hexdigest()[:16]}.png"
@@ -459,54 +465,108 @@ def indexar_memorandos(
                         continue
 
                     if row:
-                        conn.execute(
-                            f"""
-                            UPDATE {tabla} SET
-                                nombre_archivo = ?,
-                                texto_extraido = ?,
-                                cantidad_paginas = ?,
-                                primera_hoja_img = ?,
-                                fecha_indexado = CURRENT_TIMESTAMP,
-                                activo = 1,
-                                tamanio_bytes = ?,
-                                mtime = ?
-                            WHERE id = ?
-                            """,
-                            (
-                                abs_path.name,
-                                texto,
-                                n_pages,
-                                preview_path.as_posix(),
-                                size,
-                                mtime,
-                                row["id"],
-                            ),
-                        )
+                        if tabla == "memorandos":
+                            conn.execute(
+                                f"""
+                                UPDATE {tabla} SET
+                                    nombre_archivo = ?,
+                                    texto_extraido = ?,
+                                    cantidad_paginas = ?,
+                                    primera_hoja_img = ?,
+                                    fecha_indexado = CURRENT_TIMESTAMP,
+                                    activo = 1,
+                                    tamanio_bytes = ?,
+                                    mtime = ?,
+                                    fecha_hecho = ?
+                                WHERE id = ?
+                                """,
+                                (
+                                    abs_path.name,
+                                    texto,
+                                    n_pages,
+                                    preview_path.as_posix(),
+                                    size,
+                                    mtime,
+                                    extraer_fecha_hecho(abs_path.name),
+                                    row["id"],
+                                ),
+                            )
+                        else:
+                            conn.execute(
+                                f"""
+                                UPDATE {tabla} SET
+                                    nombre_archivo = ?,
+                                    texto_extraido = ?,
+                                    cantidad_paginas = ?,
+                                    primera_hoja_img = ?,
+                                    fecha_indexado = CURRENT_TIMESTAMP,
+                                    activo = 1,
+                                    tamanio_bytes = ?,
+                                    mtime = ?
+                                WHERE id = ?
+                                """,
+                                (
+                                    abs_path.name,
+                                    texto,
+                                    n_pages,
+                                    preview_path.as_posix(),
+                                    size,
+                                    mtime,
+                                    row["id"],
+                                ),
+                            )
                         actualizados += 1
                     else:
-                        conn.execute(
-                            f"""
-                            INSERT INTO {tabla} (
-                                nombre_archivo,
-                                ruta_archivo,
-                                texto_extraido,
-                                cantidad_paginas,
-                                primera_hoja_img,
-                                activo,
-                                tamanio_bytes,
-                                mtime
-                            ) VALUES (?, ?, ?, ?, ?, 1, ?, ?)
-                            """,
-                            (
-                                abs_path.name,
-                                rel,
-                                texto,
-                                n_pages,
-                                preview_path.as_posix(),
-                                size,
-                                mtime,
-                            ),
-                        )
+                        if tabla == "memorandos":
+                            conn.execute(
+                                f"""
+                                INSERT INTO {tabla} (
+                                    nombre_archivo,
+                                    ruta_archivo,
+                                    texto_extraido,
+                                    cantidad_paginas,
+                                    primera_hoja_img,
+                                    activo,
+                                    tamanio_bytes,
+                                    mtime,
+                                    fecha_hecho
+                                ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
+                                """,
+                                (
+                                    abs_path.name,
+                                    rel,
+                                    texto,
+                                    n_pages,
+                                    preview_path.as_posix(),
+                                    size,
+                                    mtime,
+                                    extraer_fecha_hecho(abs_path.name),
+                                ),
+                            )
+                        else:
+                            conn.execute(
+                                f"""
+                                INSERT INTO {tabla} (
+                                    nombre_archivo,
+                                    ruta_archivo,
+                                    texto_extraido,
+                                    cantidad_paginas,
+                                    primera_hoja_img,
+                                    activo,
+                                    tamanio_bytes,
+                                    mtime
+                                ) VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+                                """,
+                                (
+                                    abs_path.name,
+                                    rel,
+                                    texto,
+                                    n_pages,
+                                    preview_path.as_posix(),
+                                    size,
+                                    mtime,
+                                ),
+                            )
                         nuevos += 1
 
                 # Commit parcial cada 50 PDFs para no bloquear SQLite indefinidamente.

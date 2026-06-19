@@ -3,6 +3,7 @@ import concurrent.futures
 import hashlib
 import io
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional, Tuple
@@ -268,6 +269,34 @@ def _safe_progress(progress_callback: Optional[Callable[[dict[str, Any]], None]]
             progress_callback(data)
         except Exception:
             pass
+
+
+_RE_FECHA_ISO = re.compile(r'(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)')
+_RE_FECHA_DMY = re.compile(r'(?<!\d)(\d{2})-(\d{2})-(\d{4})(?!\d)')
+
+
+def extraer_fecha_hecho(nombre_archivo: str) -> Optional[str]:
+    """
+    Extrae la fecha del hecho del nombre de archivo, si existe.
+
+    Intenta primero YYYY-MM-DD (cubre la mayoría de los casos, incluye
+    archivos con la fecha al inicio del nombre tipo GA-YYYY-MM-DD_...).
+    Si no encuentra, intenta DD-MM-YYYY. Devuelve None si no hay ningún
+    patrón o la fecha extraída no es una fecha real (ej. mes 13).
+    """
+    m = _RE_FECHA_ISO.search(nombre_archivo)
+    if m:
+        anio, mes, dia = m.groups()
+    else:
+        m = _RE_FECHA_DMY.search(nombre_archivo)
+        if not m:
+            return None
+        dia, mes, anio = m.groups()
+
+    try:
+        return datetime(int(anio), int(mes), int(dia)).strftime("%Y-%m-%d")
+    except ValueError:
+        return None
 
 
 _TABLAS_INDEXABLES = {

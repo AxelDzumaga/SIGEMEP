@@ -149,6 +149,7 @@ def init_db() -> None:
         _add_column_if_missing(conn, "memorandos", "ultima_revision", "DATETIME")
 
         _add_column_if_missing(conn, "usuarios", "permiso_reservados", "INTEGER NOT NULL DEFAULT 0")
+        _add_column_if_missing(conn, "memorandos", "fecha_hecho", "TEXT")
 
         # Índice FTS5 para búsqueda de texto completo.
         conn.execute(

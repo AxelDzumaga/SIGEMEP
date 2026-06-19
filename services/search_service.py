@@ -10,6 +10,11 @@ _TABLAS_FTS = {
     "reservados": "reservados_fts",
 }
 
+_COLUMNA_FECHA = {
+    "memorandos": "fecha_hecho",
+    "reservados": "fecha_indexado",
+}
+
 
 def _validar_tabla(tabla: str) -> str:
     if tabla not in _TABLAS_FTS:
@@ -46,13 +51,14 @@ def _buscar_solo_filtros(
 ) -> list[dict[str, Any]]:
     """Devuelve registros por fecha/páginas sin texto de búsqueda."""
     tabla = _validar_tabla(tabla)
+    columna_fecha = _COLUMNA_FECHA[tabla]
     conditions = ["activo = 1"]
     params: list[Any] = []
     if fecha_desde:
-        conditions.append("date(fecha_indexado) >= date(?)")
+        conditions.append(f"date({columna_fecha}) >= date(?)")
         params.append(fecha_desde)
     if fecha_hasta:
-        conditions.append("date(fecha_indexado) <= date(?)")
+        conditions.append(f"date({columna_fecha}) <= date(?)")
         params.append(fecha_hasta)
     if paginas_min > 0:
         conditions.append("cantidad_paginas >= ?")
@@ -111,11 +117,12 @@ def buscar_memorandos(
             conditions = [f"id IN ({placeholders})", "activo = 1"]
             params: list[Any] = list(ids)
 
+            columna_fecha = _COLUMNA_FECHA[tabla]
             if fecha_desde:
-                conditions.append("date(fecha_indexado) >= date(?)")
+                conditions.append(f"date({columna_fecha}) >= date(?)")
                 params.append(fecha_desde)
             if fecha_hasta:
-                conditions.append("date(fecha_indexado) <= date(?)")
+                conditions.append(f"date({columna_fecha}) <= date(?)")
                 params.append(fecha_hasta)
             if paginas_min > 0:
                 conditions.append("cantidad_paginas >= ?")

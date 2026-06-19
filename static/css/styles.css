@@ -2029,6 +2029,38 @@ form[action="/admin/auditoria"] .btn:hover {
     color: #ffffff !important;
 }
 
+/* Ítem activo (página actual) */
+.nav-item.active {
+    background: rgba(255, 115, 0, 0.15) !important;
+    border-color: rgba(255, 115, 0, 0.40) !important;
+    color: #ffffff !important;
+    box-shadow:
+        inset 4px 0 0 #ff7300,
+        0 6px 16px rgba(255, 115, 0, 0.12) !important;
+    transform: translateX(3px);
+    pointer-events: none;
+}
+.nav-item.active i {
+    color: #ffb36b !important;
+}
+
+/* Badge de contador en nav (ej: alertas pendientes) */
+.nav-badge {
+    margin-left: auto !important;
+    min-width: 20px !important;
+    height: 20px !important;
+    padding: 0 6px !important;
+    border-radius: 999px !important;
+    background: #ff7300 !important;
+    color: #111 !important;
+    font-size: 10px !important;
+    font-weight: 950 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 1 !important;
+}
+
 /* Cerrar sesión */
 .sidebar .logout {
     background: rgba(239, 68, 68, 0.08) !important;

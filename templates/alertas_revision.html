@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Alertas de Revisión · SIGEMEP{% endblock %}
+{% block page_title %}Alertas de revisión{% endblock %}
+
+{% block head %}
+<style>
+.al-page{display:grid;gap:20px}
+.al-hero{position:relative;overflow:hidden;background:radial-gradient(circle at top right,rgba(255,115,0,.16),transparent 35%),linear-gradient(145deg,rgba(18,24,28,.98),rgba(7,10,12,.99));border:1px solid rgba(255,255,255,.10);border-left:5px solid var(--orange);border-radius:30px;padding:28px;box-shadow:var(--shadow);display:flex;justify-content:space-between;gap:20px;align-items:flex-start}
+.al-hero h1{margin:16px 0 0;color:#fff;font-size:38px;font-weight:950;letter-spacing:-1px}
+.al-hero p{margin:10px 0 0;color:var(--muted);font-size:14px}
+.al-badge-pend{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:999px;background:rgba(251,146,60,.14);border:1px solid rgba(251,146,60,.32);color:#fed7aa;font-size:12px;font-weight:950;margin-top:14px}
+.al-badge-pend i{color:#fb923c}
+.al-badge-ok{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.28);color:#86efac}
+.al-badge-ok i{color:#22c55e}
+
+.al-alert{border-radius:18px;padding:14px 16px;border:1px solid rgba(255,115,0,.32);background:rgba(255,115,0,.10);color:#ffcfaa;font-weight:850;display:flex;align-items:center;gap:10px}
+
+.al-filter{background:linear-gradient(145deg,rgba(18,24,28,.96),rgba(7,10,12,.99));border:1px solid rgba(255,255,255,.10);border-radius:22px;padding:16px 18px;box-shadow:var(--shadow);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.al-filter span{color:#9ca3af;font-size:13px;font-weight:900;margin-right:4px}
+.al-filter-btn{min-height:34px;border-radius:12px;padding:7px 14px;font-size:12px;font-weight:950;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#d1d5db;cursor:pointer;text-decoration:none!important;display:inline-flex;align-items:center;gap:7px;font-family:inherit}
+.al-filter-btn:hover{background:rgba(255,115,0,.12);border-color:rgba(255,115,0,.30);color:#fff}
+.al-filter-btn.active{background:rgba(255,115,0,.18);border-color:rgba(255,115,0,.45);color:#ffb36b}
+
+.al-card{background:linear-gradient(145deg,rgba(18,24,28,.96),rgba(7,10,12,.99));border:1px solid rgba(255,255,255,.10);border-radius:26px;padding:16px;box-shadow:var(--shadow);overflow:auto}
+.al-table{width:100%;min-width:900px;border-collapse:separate;border-spacing:0}
+.al-table th{color:#ffb36b;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:13px 12px;border-bottom:1px solid rgba(255,115,0,.28);white-space:nowrap}
+.al-table td{color:#e5e7eb;padding:13px 12px;border-bottom:1px solid rgba(255,255,255,.07);vertical-align:middle;font-size:13px}
+.al-table tr:last-child td{border-bottom:none}
+.al-table tr:hover td{background:rgba(255,115,0,.04)}
+
+.pill-pend{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:950;background:rgba(251,146,60,.14);border:1px solid rgba(251,146,60,.30);color:#fed7aa}
+.pill-rev{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:950;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.26);color:#86efac}
+
+.al-hash{font-family:Consolas,monospace;font-size:11px;color:#6b7280}
+.al-nombre{font-weight:950;color:#fff;font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.al-msg{color:#9ca3af;font-size:12px;font-style:italic}
+
+.mini-btn{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff!important;border-radius:12px;min-height:32px;padding:6px 10px;font-size:11px;font-weight:950;text-decoration:none!important;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:inherit}
+.mini-btn:hover{transform:translateY(-1px)}
+.mini-green{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.28);color:#86efac!important}
+.mini-green:hover{background:rgba(34,197,94,.20)}
+
+.al-empty{padding:48px 28px;text-align:center;color:#9ca3af}
+.al-empty i{font-size:38px;color:rgba(255,115,0,.45);margin-bottom:14px}
+.al-empty strong{display:block;color:#fff;font-size:16px;font-weight:950;margin-bottom:6px}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="al-page">
+
+  <!-- ── HERO ── -->
+  <section class="al-hero">
+    <div>
+      <span class="section-tag"><i class="fa-solid fa-bell"></i> Alertas de revisión</span>
+      <h1>Alertas de revisión</h1>
+      <p>Notificaciones enviadas por usuarios de Brigada cuando detectan un archivo duplicado o con error al subir.</p>
+      {% if n_pendientes > 0 %}
+        <div class="al-badge-pend"><i class="fa-solid fa-circle-exclamation"></i> {{ n_pendientes }} alerta{{ 's' if n_pendientes != 1 else '' }} pendiente{{ 's' if n_pendientes != 1 else '' }}</div>
+      {% else %}
+        <div class="al-badge-pend al-badge-ok"><i class="fa-solid fa-circle-check"></i> Sin alertas pendientes</div>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if flash %}
+  <div class="al-alert"><i class="fa-solid fa-circle-info"></i> {{ flash }}</div>
+  {% endif %}
+
+  <!-- ── FILTROS ── -->
+  <div class="al-filter">
+    <span>Filtrar:</span>
+    <a href="/admin/alertas_revision" class="al-filter-btn {% if not filtro_estado %}active{% endif %}">
+      <i class="fa-solid fa-list"></i> Todas
+    </a>
+    <a href="/admin/alertas_revision?estado=pendiente" class="al-filter-btn {% if filtro_estado == 'pendiente' %}active{% endif %}">
+      <i class="fa-solid fa-clock"></i> Pendientes
+    </a>
+    <a href="/admin/alertas_revision?estado=revisado" class="al-filter-btn {% if filtro_estado == 'revisado' %}active{% endif %}">
+      <i class="fa-solid fa-check"></i> Revisadas
+    </a>
+  </div>
+
+  <!-- ── TABLA ── -->
+  <div class="al-card">
+    {% if alertas %}
+    <table class="al-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Fecha</th>
+          <th>Usuario (Brigada)</th>
+          <th>Archivo reportado</th>
+          <th>Hash SHA-256</th>
+          <th>Mensaje</th>
+          <th>Estado</th>
+          <th>Acción</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in alertas %}
+        <tr>
+          <td>{{ a.id }}</td>
+          <td style="white-space:nowrap">{{ a.fecha_alerta or '—' }}</td>
+          <td>
+            <strong style="color:#fff">{{ a.usuario }}</strong>
+            {% if a.nombre_apellido %}
+            <div style="color:#9ca3af;font-size:11px;margin-top:2px">{{ a.nombre_apellido }}</div>
+            {% endif %}
+          </td>
+          <td><div class="al-nombre" title="{{ a.nombre_archivo }}">{{ a.nombre_archivo or '—' }}</div></td>
+          <td><span class="al-hash">{{ a.hash_sha256[:16] if a.hash_sha256 else '—' }}…</span></td>
+          <td><span class="al-msg">{{ a.mensaje or '—' }}</span></td>
+          <td>
+            {% if a.estado == 'pendiente' %}
+              <span class="pill-pend"><i class="fa-solid fa-clock"></i> Pendiente</span>
+            {% else %}
+              <span class="pill-rev"><i class="fa-solid fa-check"></i> Revisada</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if a.estado == 'pendiente' %}
+            <form method="post" action="/admin/alertas_revision/{{ a.id }}/marcar_revisado">
+              <button type="submit" class="mini-btn mini-green">
+                <i class="fa-solid fa-check"></i> Marcar revisada
+              </button>
+            </form>
+            {% else %}
+              <span style="color:#6b7280;font-size:12px">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="al-empty">
+      <div><i class="fa-solid fa-bell-slash"></i></div>
+      <strong>Sin alertas{% if filtro_estado %} {{ filtro_estado }}s{% endif %}</strong>
+      <span>Cuando un usuario de Brigada detecte un duplicado y avise al administrador, aparecerá aquí.</span>
+    </div>
+    {% endif %}
+  </div>
+
+</section>
+{% endblock %}

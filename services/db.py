@@ -150,6 +150,29 @@ def init_db() -> None:
 
         _add_column_if_missing(conn, "usuarios", "permiso_reservados", "INTEGER NOT NULL DEFAULT 0")
         _add_column_if_missing(conn, "memorandos", "fecha_hecho", "TEXT")
+        _add_column_if_missing(conn, "memorandos", "hash_sha256", "TEXT")
+        _add_column_if_missing(conn, "memorandos", "usuario_id", "INTEGER")
+        _add_column_if_missing(conn, "memorandos", "tamanio_bytes", "INTEGER")
+        _add_column_if_missing(conn, "memorandos", "mtime", "INTEGER")
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS alertas_revision (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                hash_sha256 TEXT NOT NULL,
+                nombre_archivo TEXT NOT NULL,
+                usuario_id INTEGER NOT NULL,
+                fecha_alerta DATETIME DEFAULT CURRENT_TIMESTAMP,
+                estado TEXT NOT NULL DEFAULT 'pendiente' CHECK(estado IN ('pendiente','revisado')),
+                mensaje TEXT,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_memorandos_hash ON memorandos(hash_sha256) "
+            "WHERE hash_sha256 IS NOT NULL"
+        )
 
         # Índice FTS5 para búsqueda de texto completo.
         conn.execute(

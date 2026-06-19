@@ -15,25 +15,28 @@
 <div>
 <div class="brand"><div class="brand-logo"><i class="fa-solid fa-shield-halved"></i></div><div><h1>SIGEMEP</h1><p>Uso interno</p></div></div>
 <nav class="nav-menu">
+{% set p = request.url.path %}
 {% if user.rol == 'ADMIN' %}
-<a href="/dashboard/admin" class="nav-item"><i class="fa-solid fa-house"></i><span>Inicio</span></a>
-<a href="/buscar" class="nav-item"><i class="fa-solid fa-magnifying-glass"></i><span>Buscar memorandos</span></a>
-<a href="/admin/usuarios" class="nav-item"><i class="fa-solid fa-users-gear"></i><span>Usuarios</span></a>
-<a href="/admin/auditoria" class="nav-item"><i class="fa-solid fa-shield-check"></i><span>Auditoría</span></a>
-<a href="/admin/ingresos" class="nav-item"><i class="fa-solid fa-clock-rotate-left"></i><span>Ingresos</span></a>
-<a href="/admin/reindexar" class="nav-item"><i class="fa-solid fa-file-pdf"></i><span>Indexar PDFs</span></a>
+<a href="/dashboard/admin" class="nav-item{% if p == '/dashboard/admin' %} active{% endif %}"><i class="fa-solid fa-house"></i><span>Inicio</span></a>
+<a href="/buscar" class="nav-item{% if p.startswith('/buscar') or p.startswith('/buscar/resultados') %} active{% endif %}"><i class="fa-solid fa-magnifying-glass"></i><span>Buscar memorandos</span></a>
+<a href="/admin/usuarios" class="nav-item{% if p.startswith('/admin/usuarios') %} active{% endif %}"><i class="fa-solid fa-users-gear"></i><span>Usuarios</span></a>
+<a href="/admin/auditoria" class="nav-item{% if p == '/admin/auditoria' %} active{% endif %}"><i class="fa-solid fa-shield-check"></i><span>Auditoría</span></a>
+<a href="/admin/ingresos" class="nav-item{% if p == '/admin/ingresos' %} active{% endif %}"><i class="fa-solid fa-clock-rotate-left"></i><span>Ingresos</span></a>
+<a href="/admin/reindexar" class="nav-item{% if p == '/admin/reindexar' %} active{% endif %}"><i class="fa-solid fa-file-pdf"></i><span>Indexar PDFs</span></a>
+<a href="/admin/alertas_revision" class="nav-item{% if p.startswith('/admin/alertas_revision') %} active{% endif %}"><i class="fa-solid fa-bell"></i><span>Alertas revisión</span><span class="nav-badge" id="nav-alertas-badge" style="display:none"></span></a>
 {% elif user.rol == 'JEFE' %}
-<a href="/dashboard/jefe" class="nav-item"><i class="fa-solid fa-house"></i><span>Inicio</span></a>
-<a href="/buscar" class="nav-item"><i class="fa-solid fa-magnifying-glass"></i><span>Buscar memorandos</span></a>
-<a href="/jefe/brigada_movimientos" class="nav-item"><i class="fa-solid fa-user-shield"></i><span>Movimientos Brigada</span></a>
+<a href="/dashboard/jefe" class="nav-item{% if p == '/dashboard/jefe' %} active{% endif %}"><i class="fa-solid fa-house"></i><span>Inicio</span></a>
+<a href="/buscar" class="nav-item{% if p.startswith('/buscar') %} active{% endif %}"><i class="fa-solid fa-magnifying-glass"></i><span>Buscar memorandos</span></a>
+<a href="/jefe/brigada_movimientos" class="nav-item{% if p.startswith('/jefe/brigada_movimientos') %} active{% endif %}"><i class="fa-solid fa-user-shield"></i><span>Movimientos Brigada</span></a>
 {% elif user.rol == 'BRIGADA' %}
-<a href="/dashboard/brigada" class="nav-item"><i class="fa-solid fa-house"></i><span>Inicio</span></a>
-<a href="/buscar" class="nav-item"><i class="fa-solid fa-magnifying-glass"></i><span>Buscar memorandos</span></a>
+<a href="/dashboard/brigada" class="nav-item{% if p == '/dashboard/brigada' %} active{% endif %}"><i class="fa-solid fa-house"></i><span>Inicio</span></a>
+<a href="/buscar" class="nav-item{% if p.startswith('/buscar') %} active{% endif %}"><i class="fa-solid fa-magnifying-glass"></i><span>Buscar memorandos</span></a>
+<a href="/brigada/insertar_memorando" class="nav-item{% if p == '/brigada/insertar_memorando' %} active{% endif %}"><i class="fa-solid fa-file-arrow-up"></i><span>Insertar memorando</span></a>
 {% endif %}
 {% if user.rol == 'ADMIN' or user.permiso_reservados %}
-<a href="/reservados" class="nav-item"><i class="fa-solid fa-lock"></i><span>Reservados</span></a>
+<a href="/reservados" class="nav-item{% if p.startswith('/reservados') %} active{% endif %}"><i class="fa-solid fa-lock"></i><span>Reservados</span></a>
 {% endif %}
-<a href="/cambiar_password" class="nav-item"><i class="fa-solid fa-key"></i><span>Cambiar contraseña</span></a>
+<a href="/cambiar_password" class="nav-item{% if p == '/cambiar_password' %} active{% endif %}"><i class="fa-solid fa-key"></i><span>Cambiar contraseña</span></a>
 </nav>
 </div>
 <a href="/logout" class="nav-item logout"><i class="fa-solid fa-right-from-bracket"></i><span>Cerrar sesión</span></a>
@@ -55,5 +58,19 @@
 {% endif %}
 <script src="{{ url_for('static', path='js/security.js') }}"></script>
 {% block scripts %}{% endblock %}
+{% if user and user.rol == 'ADMIN' %}
+<script>
+(function(){
+  var badge = document.getElementById('nav-alertas-badge');
+  if(!badge) return;
+  fetch('/api/alertas_pendientes').then(function(r){return r.json();}).then(function(d){
+    if(d.n > 0){
+      badge.textContent = d.n > 99 ? '99+' : d.n;
+      badge.style.display = 'inline-flex';
+    }
+  }).catch(function(){});
+})();
+</script>
+{% endif %}
 </body>
 </html>

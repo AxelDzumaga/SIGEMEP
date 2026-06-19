@@ -1,6 +1,7 @@
 """SIGEMEP - Sistema de Consulta y Auditoría de Memorandos."""
 import base64
 import csv
+import hashlib
 import io
 import logging
 import threading
@@ -11,13 +12,13 @@ from pathlib import Path
 from typing import Annotated, Any, Optional
 from urllib.parse import urlencode
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from config import BASE_DIR, SESSION_SECRET
+from config import BASE_DIR, PREVIEWS_DIR, SESSION_SECRET
 from services.audit_service import listar_auditoria, registrar_auditoria, registrar_busqueda
 from services.auth_service import (
     generar_temp_password,
@@ -29,13 +30,15 @@ from services.auth_service import (
     validar_usuario_unico,
     verificar_password,
 )
-from services.db import get_config, get_db, init_db, set_config
+from services.db import get_config, get_db, init_db, rebuild_fts, set_config
 from services.pdf_service import (
     carpeta_pdf_actual,
     carpeta_reservados_actual,
+    extraer_fecha_hecho,
     imagen_pagina_con_marca,
     imagen_primera_hoja_con_marca,
     indexar_memorandos,
+    renderizar_primera_hoja_base,
     ruta_absoluta_segura,
     ruta_absoluta_segura_reservados,
 )
@@ -1789,3 +1792,235 @@ def acceso_denegado(request: Request, user: dict = Depends(require_login)):
 @app.get("/error", response_class=HTMLResponse)
 def error_page(request: Request):
     return templates.TemplateResponse("error.html", {"request": request, "mensaje": "Error."})
+
+
+# ── INSERTAR MEMORANDO (BRIGADA) ──────────────────────────────────
+
+@app.get("/brigada/insertar_memorando", response_class=HTMLResponse)
+def insertar_memorando_get(request: Request, user: dict = Depends(require_roles("BRIGADA"))):
+    require_password_ok(request, user)
+    return templates.TemplateResponse("insertar_memorando.html", {"request": request, "user": user})
+
+
+@app.post("/brigada/insertar_memorando/verificar_hash")
+def insertar_memorando_verificar_hash(
+    request: Request,
+    user: dict = Depends(require_roles("BRIGADA")),
+    hash_sha256: str = Form(...),
+):
+    require_password_ok(request, user)
+    h = hash_sha256.strip().lower()
+    if len(h) != 64 or not all(c in "0123456789abcdef" for c in h):
+        return JSONResponse({"error": "Hash inválido."}, status_code=400)
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT m.nombre_archivo, m.fecha_indexado, u.usuario
+            FROM memorandos m
+            LEFT JOIN usuarios u ON u.id = m.usuario_id
+            WHERE m.hash_sha256 = ? AND m.activo = 1
+            LIMIT 1
+            """,
+            (h,),
+        ).fetchone()
+    if row:
+        return JSONResponse({
+            "existe": True,
+            "nombre_archivo": row["nombre_archivo"],
+            "fecha_subida": row["fecha_indexado"],
+            "usuario": row["usuario"] or "—",
+        })
+    return JSONResponse({"existe": False})
+
+
+@app.post("/brigada/insertar_memorando/guardar")
+async def insertar_memorando_guardar(
+    request: Request,
+    user: dict = Depends(require_roles("BRIGADA")),
+    archivo: UploadFile = File(...),
+):
+    require_password_ok(request, user)
+
+    nombre_original = (archivo.filename or "memorando.pdf").strip()
+    if not nombre_original.lower().endswith(".pdf"):
+        raise HTTPException(400, detail="Solo se aceptan archivos PDF.")
+
+    contenido = await archivo.read()
+    if len(contenido) < 5:
+        raise HTTPException(400, detail="El archivo está vacío o no es un PDF válido.")
+
+    hash_sha256 = hashlib.sha256(contenido).hexdigest()
+
+    with get_db() as conn:
+        dup = conn.execute(
+            "SELECT nombre_archivo FROM memorandos WHERE hash_sha256 = ? AND activo = 1 LIMIT 1",
+            (hash_sha256,),
+        ).fetchone()
+        if dup:
+            return JSONResponse(
+                {"error": "duplicado", "detail": "El archivo ya fue subido anteriormente.",
+                 "nombre_existente": dup["nombre_archivo"]},
+                status_code=409,
+            )
+        carpeta = carpeta_pdf_actual(conn)
+
+    carpeta_path = Path(str(carpeta))
+    if not carpeta_path.is_dir():
+        raise HTTPException(500, detail="La carpeta de destino no está disponible. Contactá al administrador.")
+
+    destino = carpeta_path / nombre_original
+    if destino.exists():
+        stem, suf = Path(nombre_original).stem, Path(nombre_original).suffix
+        i = 1
+        while destino.exists():
+            destino = carpeta_path / f"{stem}_{i}{suf}"
+            i += 1
+
+    destino.write_bytes(contenido)
+
+    texto, n_pages = "", 0
+    preview_path: Optional[Path] = None
+    try:
+        import fitz as _fitz
+        doc = _fitz.open(stream=contenido, filetype="pdf")
+        parts = [doc.load_page(i).get_text("text") or "" for i in range(len(doc))]
+        n_pages = len(doc)
+        meta = doc.metadata or {}
+        doc.close()
+        meta_lines = [f"{k}: {v}" for k, v in (meta or {}).items() if v]
+        texto = "\n".join(parts)
+        if meta_lines:
+            texto += "\n" + "\n".join(meta_lines)
+        preview_name = f"m_{hashlib.md5(hash_sha256.encode()).hexdigest()[:16]}.png"
+        preview_path = PREVIEWS_DIR / preview_name
+        renderizar_primera_hoja_base(destino, preview_path)
+    except Exception as exc:
+        logger.warning("Proceso PDF fallido para %s: %s", destino.name, exc)
+
+    try:
+        rel = destino.resolve().relative_to(carpeta_path.resolve()).as_posix()
+    except ValueError:
+        rel = destino.name
+
+    with get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO memorandos (
+                nombre_archivo, ruta_archivo, texto_extraido, cantidad_paginas,
+                primera_hoja_img, activo, tamanio_bytes, mtime, fecha_hecho,
+                hash_sha256, usuario_id
+            ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
+            """,
+            (
+                destino.name, rel, texto, n_pages,
+                str(preview_path) if preview_path else None,
+                len(contenido), int(destino.stat().st_mtime),
+                extraer_fecha_hecho(destino.name),
+                hash_sha256, user["id"],
+            ),
+        )
+        try:
+            rebuild_fts(conn)
+        except Exception:
+            pass
+        registrar_auditoria(
+            conn, "MEMORANDO_SUBIDO",
+            usuario_id=user["id"],
+            detalle={"nombre": destino.name, "paginas": n_pages, "bytes": len(contenido)},
+            ip=client_ip(request), equipo=ua(request), resultado="OK",
+        )
+
+    return JSONResponse({"ok": True, "nombre": destino.name, "paginas": n_pages})
+
+
+@app.post("/brigada/insertar_memorando/avisar_admin")
+def insertar_memorando_avisar_admin(
+    request: Request,
+    user: dict = Depends(require_roles("BRIGADA")),
+    hash_sha256: str = Form(...),
+    nombre_archivo: str = Form(""),
+):
+    require_password_ok(request, user)
+    h = hash_sha256.strip().lower()[:64]
+    nombre = nombre_archivo.strip()[:255]
+    with get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO alertas_revision (hash_sha256, nombre_archivo, usuario_id, mensaje)
+            VALUES (?, ?, ?, ?)
+            """,
+            (h, nombre, user["id"], "El usuario reporta posible duplicado o error al subir."),
+        )
+        registrar_auditoria(
+            conn, "ALERTA_REVISION_ENVIADA",
+            usuario_id=user["id"],
+            detalle={"hash": h[:16] + "...", "nombre": nombre},
+            ip=client_ip(request), equipo=ua(request), resultado="OK",
+        )
+    return JSONResponse({"ok": True, "mensaje": "El administrador fue notificado. Revisará el caso."})
+
+
+# ── ALERTAS DE REVISIÓN (ADMIN) ──────────────────────────────────
+
+@app.get("/admin/alertas_revision", response_class=HTMLResponse)
+def admin_alertas_revision(
+    request: Request,
+    user: dict = Depends(require_admin),
+    estado: Optional[str] = Query(None),
+):
+    flash = request.session.pop("sigemep_flash", None)
+    sql = """
+        SELECT ar.id, ar.hash_sha256, ar.nombre_archivo, ar.fecha_alerta,
+               ar.estado, ar.mensaje, u.usuario, u.nombre_apellido
+        FROM alertas_revision ar
+        JOIN usuarios u ON u.id = ar.usuario_id
+    """
+    params: list[Any] = []
+    if estado in ("pendiente", "revisado"):
+        sql += " WHERE ar.estado = ?"
+        params.append(estado)
+    sql += " ORDER BY ar.fecha_alerta DESC"
+    with get_db() as conn:
+        rows = conn.execute(sql, params).fetchall()
+        n_pendientes = conn.execute(
+            "SELECT COUNT(*) FROM alertas_revision WHERE estado = 'pendiente'"
+        ).fetchone()[0]
+    return templates.TemplateResponse("alertas_revision.html", {
+        "request": request, "user": user,
+        "alertas": [dict(r) for r in rows],
+        "n_pendientes": n_pendientes,
+        "filtro_estado": estado or "",
+        "flash": flash,
+    })
+
+
+@app.get("/api/alertas_pendientes")
+def api_alertas_pendientes(user: dict = Depends(require_admin)):
+    with get_db() as conn:
+        n = conn.execute(
+            "SELECT COUNT(*) FROM alertas_revision WHERE estado = 'pendiente'"
+        ).fetchone()[0]
+    return {"n": n}
+
+
+@app.post("/admin/alertas_revision/{alerta_id}/marcar_revisado")
+def admin_marcar_alerta_revisado(
+    alerta_id: int, request: Request, user: dict = Depends(require_admin),
+):
+    with get_db() as conn:
+        alerta = conn.execute(
+            "SELECT id FROM alertas_revision WHERE id = ?", (alerta_id,)
+        ).fetchone()
+        if not alerta:
+            raise HTTPException(404)
+        conn.execute(
+            "UPDATE alertas_revision SET estado = 'revisado' WHERE id = ?", (alerta_id,)
+        )
+        registrar_auditoria(
+            conn, "ALERTA_MARCADA_REVISADA",
+            usuario_id=user["id"],
+            detalle={"alerta_id": alerta_id},
+            ip=client_ip(request), equipo=ua(request), resultado="OK",
+        )
+    request.session["sigemep_flash"] = "Alerta marcada como revisada."
+    return RedirectResponse("/admin/alertas_revision", status_code=302)

@@ -324,7 +324,7 @@ async function _procesar(f) {
     _setEstado('verifying');
     const fd = new FormData();
     fd.append('hash_sha256', hex);
-    const resp = await fetch('/brigada/insertar_memorando/verificar_hash', { method:'POST', body:fd });
+    const resp = await fetch('/brigada/insertar_memorando/verificar_hash', { method:'POST', body:fd, headers:{'X-CSRF-Token': window.SIGEMEP_CSRF_TOKEN} });
     const data = await resp.json();
 
     if(!resp.ok) { throw new Error(data.error || 'Error en verificación'); }
@@ -394,6 +394,7 @@ window.insGuardar = async function() {
 
       xhr.addEventListener('error', () => reject(new Error('Error de conexión')));
       xhr.open('POST', '/brigada/insertar_memorando/guardar');
+      xhr.setRequestHeader('X-CSRF-Token', window.SIGEMEP_CSRF_TOKEN);
       xhr.send(fd);
     });
 
@@ -418,7 +419,7 @@ window.insAvisarAdmin = async function() {
     const fd = new FormData();
     fd.append('hash_sha256',   _hash        || '');
     fd.append('nombre_archivo', _archivo ? _archivo.name : '');
-    const resp = await fetch('/brigada/insertar_memorando/avisar_admin', { method:'POST', body:fd });
+    const resp = await fetch('/brigada/insertar_memorando/avisar_admin', { method:'POST', body:fd, headers:{'X-CSRF-Token': window.SIGEMEP_CSRF_TOKEN} });
     const data = await resp.json();
     if(data.ok) { _setEstado('alerted'); }
     else         { throw new Error(data.detail || 'No se pudo enviar la notificación'); }

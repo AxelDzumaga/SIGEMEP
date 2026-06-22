@@ -20,6 +20,12 @@ def ensure_directories() -> None:
 def get_db():
     conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    # WAL permite lectores concurrentes mientras hay una escritura en curso
+    # (la indexación en background + requests normales escribiendo a la vez).
+    # busy_timeout hace que una escritura bloqueada reintente en vez de
+    # fallar al instante con "database is locked".
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     try:
         yield conn
         conn.commit()
@@ -149,6 +155,7 @@ def init_db() -> None:
         _add_column_if_missing(conn, "memorandos", "ultima_revision", "DATETIME")
 
         _add_column_if_missing(conn, "usuarios", "permiso_reservados", "INTEGER NOT NULL DEFAULT 0")
+        _add_column_if_missing(conn, "usuarios", "intentos_fallidos", "INTEGER NOT NULL DEFAULT 0")
         _add_column_if_missing(conn, "memorandos", "fecha_hecho", "TEXT")
         _add_column_if_missing(conn, "memorandos", "hash_sha256", "TEXT")
         _add_column_if_missing(conn, "memorandos", "usuario_id", "INTEGER")

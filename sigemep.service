@@ -1,0 +1,24 @@
+[Unit]
+Description=SIGEMEP - Sistema de Consulta y Auditoria de Memorandos
+After=network.target
+
+[Service]
+Type=simple
+User=sigemep
+Group=sigemep
+# Ajustar esta ruta a donde se despliegue el proyecto en el servidor Ubuntu.
+WorkingDirectory=/opt/sigemep
+EnvironmentFile=/opt/sigemep/.env
+ExecStart=/opt/sigemep/venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5
+
+# Buena práctica: no usar más de un proceso. La app guarda el progreso de
+# las tareas de indexación en memoria (no en la base de datos), por lo que
+# correr varios workers/procesos rompería ese seguimiento de progreso.
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

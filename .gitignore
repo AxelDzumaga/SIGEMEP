@@ -9,3 +9,6 @@ screenshots/
 *.log
 .claude/settings.local.json
 *.bak_*
+.env
+.session_secret
+data/

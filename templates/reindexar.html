@@ -40,6 +40,7 @@
         </div>
 
         <form method="post" action="/admin/config/carpeta_pdf" class="index-path-form">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
             <label>Ruta actual / nueva ruta</label>
 
             <div class="index-path-row">
@@ -105,6 +106,7 @@
     <div class="index-actions">
 
         <form method="post" action="/admin/reindexar/iniciar?modo=rapida">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
             <button id="btn-fast" type="submit" class="btn btn-primary">
                 <i class="fa-solid fa-bolt"></i>
                 Actualización rápida
@@ -112,6 +114,7 @@
         </form>
 
         <form method="post" action="/admin/reindexar/iniciar?modo=completa">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
             <button id="btn-full" type="submit" class="btn btn-danger">
                 <i class="fa-solid fa-arrows-rotate"></i>
                 Reindexación completa
@@ -303,7 +306,8 @@
                 const resp = await fetch(form.action, {
                     method: 'POST',
                     headers: {
-                        'Accept': 'application/json'
+                        'Accept': 'application/json',
+                        'X-CSRF-Token': window.SIGEMEP_CSRF_TOKEN
                     }
                 });
 

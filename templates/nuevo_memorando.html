@@ -63,6 +63,7 @@
     </div>
 
     <form id="memo-form" method="post">
+      <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
       <!-- IDENTIFICACIÓN -->
       <div class="memo-section-title"><i class="fa-solid fa-hashtag"></i> Identificación</div>

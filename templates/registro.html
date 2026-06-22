@@ -8,6 +8,7 @@
 {% if error %}<div class="notice notice-error"><i class="fa-solid fa-triangle-exclamation"></i><span>{{ error }}</span></div>{% endif %}
 {% if ok %}<div class="notice notice-ok"><i class="fa-solid fa-circle-check"></i><span>{{ ok }}</span></div>{% endif %}
 <form method="post" action="/registro" class="auth-form">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 <div class="form-grid">
 <label><span>Nombre y apellido</span><input type="text" name="nombre_apellido" required></label>
 <label><span>DNI / Legajo</span><input type="text" name="dni_legajo" required></label>

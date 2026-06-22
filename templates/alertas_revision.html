@@ -121,6 +121,7 @@
           <td>
             {% if a.estado == 'pendiente' %}
             <form method="post" action="/admin/alertas_revision/{{ a.id }}/marcar_revisado">
+              <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
               <button type="submit" class="mini-btn mini-green">
                 <i class="fa-solid fa-check"></i> Marcar revisada
               </button>

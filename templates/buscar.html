@@ -757,6 +757,7 @@
         </p>
 
         <form id="buscar-form" method="post" action="/buscar" class="buscar-form" autocomplete="off">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
             <div class="buscar-input-shell">
                 <div class="buscar-field-wrap">
                     <i class="fa-solid fa-magnifying-glass"></i>

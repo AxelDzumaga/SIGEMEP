@@ -2,8 +2,10 @@
 import base64
 import csv
 import hashlib
+import hmac
 import io
 import logging
+import secrets
 import threading
 import traceback
 import uuid
@@ -16,9 +18,18 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request,
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from config import BASE_DIR, PREVIEWS_DIR, SESSION_SECRET
+from config import (
+    BASE_DIR,
+    MAX_INTENTOS_LOGIN,
+    MAX_UPLOAD_MB,
+    PREVIEWS_DIR,
+    SESSION_COOKIE_SECURE,
+    SESSION_INACTIVITY_TIMEOUT_MINUTOS,
+    SESSION_SECRET,
+)
 from services.audit_service import listar_auditoria, registrar_auditoria, registrar_busqueda
 from services.auth_service import (
     generar_temp_password,
@@ -48,13 +59,94 @@ from services.memo_creator import generar_pdf_memorando, nombre_archivo_memorand
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("sigemep")
 
+
+class SessionTimeoutMiddleware(BaseHTTPMiddleware):
+    """Expira la sesión por inactividad y asegura que exista un token CSRF."""
+
+    async def dispatch(self, request: Request, call_next):
+        if request.session.get("user_id"):
+            now = datetime.now().timestamp()
+            ultima_actividad = request.session.get("last_activity")
+            limite = SESSION_INACTIVITY_TIMEOUT_MINUTOS * 60
+            if ultima_actividad and (now - ultima_actividad) > limite:
+                request.session.clear()
+            else:
+                request.session["last_activity"] = now
+        if "csrf_token" not in request.session:
+            request.session["csrf_token"] = secrets.token_hex(32)
+        return await call_next(request)
+
+
+async def verificar_csrf(request: Request, csrf_token: Optional[str] = Form(None)) -> None:
+    """Dependencia para usar con Depends() en cada ruta POST/PUT/PATCH/DELETE.
+
+    El token se acepta en el campo de formulario "csrf_token" (forms HTML
+    normales, ya cubierto por el parámetro Form de esta misma función, que
+    FastAPI fusiona con los demás Form()/File() de la ruta en una sola
+    lectura del body) o en la cabecera "X-CSRF-Token" (llamadas fetch/XHR
+    desde JS que no parten de un <form>).
+
+    Nota: esto NO se implementa como middleware porque BaseHTTPMiddleware
+    rompe la lectura posterior del body si se lo lee antes de llamar a
+    call_next (el body ya fue drenado del receive() original de ASGI).
+    """
+    token_sesion = request.session.get("csrf_token")
+    token_enviado = request.headers.get("x-csrf-token") or csrf_token
+    if (
+        not token_sesion
+        or not token_enviado
+        or not hmac.compare_digest(str(token_enviado), str(token_sesion))
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Token CSRF inválido o ausente. Recargue la página e intente nuevamente.",
+        )
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Cabeceras HTTP de seguridad básicas para todas las respuestas."""
+
+    _CSP = (
+        "default-src 'self'; "
+        "img-src 'self' data:; "
+        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "font-src 'self' https://cdnjs.cloudflare.com; "
+        "script-src 'self' 'unsafe-inline'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    )
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "same-origin"
+        response.headers["Content-Security-Policy"] = self._CSP
+        return response
+
+
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app = FastAPI(title="SIGEMEP", docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
-app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, same_site="lax")
+
+# El orden de registro importa: Starlette ejecuta el último middleware añadido
+# como el más externo. SessionMiddleware debe quedar más externo que
+# SessionTimeoutMiddleware para que request.session ya exista cuando este la
+# lea/modifique (la validación CSRF en sí se hace por ruta, vía Depends
+# (verificar_csrf), no como middleware: ver comentario en verificar_csrf).
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(SessionTimeoutMiddleware)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SESSION_SECRET,
+    same_site="lax",
+    https_only=SESSION_COOKIE_SECURE,
+)
 
 ROLES_CONSULTA_MEMORANDOS = frozenset({"ADMIN", "JEFE", "BRIGADA"})
 ROLES_DESCARGA_PDF = frozenset({"ADMIN", "JEFE"})
+MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 
 INDEX_JOBS: dict[str, dict[str, Any]] = {}
 INDEX_JOBS_LOCK = threading.Lock()
@@ -301,23 +393,38 @@ def login_get(request: Request):
 
 
 @app.post("/login", response_class=HTMLResponse)
-def login_post(request: Request, usuario: str = Form(...), password: str = Form(...)):
+def login_post(request: Request, usuario: str = Form(...), password: str = Form(...), _csrf: None = Depends(verificar_csrf)):
     ip = client_ip(request)
     equipo = ua(request)
     with get_db() as conn:
         row = obtener_usuario_por_login(conn, usuario)
         if not row or not verificar_password(password, row["password_hash"]):
+            mensaje = "Usuario o contraseña incorrectos."
+            if row and row["estado"] == "ACTIVO":
+                intentos = (row["intentos_fallidos"] or 0) + 1
+                if intentos >= MAX_INTENTOS_LOGIN:
+                    conn.execute(
+                        "UPDATE usuarios SET estado = 'BLOQUEADO', intentos_fallidos = 0 WHERE id = ?",
+                        (row["id"],),
+                    )
+                    registrar_auditoria(conn, "CUENTA_BLOQUEADA_INTENTOS_FALLIDOS", usuario_id=row["id"], detalle={"intentos": intentos}, ip=ip, equipo=equipo, resultado="BLOQUEADO")
+                    mensaje = "Cuenta bloqueada por demasiados intentos fallidos. Contacte al administrador."
+                else:
+                    conn.execute("UPDATE usuarios SET intentos_fallidos = ? WHERE id = ?", (intentos, row["id"]))
+                    restantes = MAX_INTENTOS_LOGIN - intentos
+                    mensaje = f"Usuario o contraseña incorrectos. Le quedan {restantes} intento(s) antes del bloqueo automático de la cuenta."
             registrar_auditoria(conn, "LOGIN_FALLIDO", usuario_id=row["id"] if row else None, detalle={"usuario_ingresado": usuario.strip()}, ip=ip, equipo=equipo, resultado="FALLIDO")
-            return templates.TemplateResponse("login.html", {"request": request, "error": "Usuario o contraseña incorrectos."}, status_code=401)
+            return templates.TemplateResponse("login.html", {"request": request, "error": mensaje}, status_code=401)
         u = dict(row)
         if u["estado"] != "ACTIVO":
             registrar_auditoria(conn, "LOGIN_FALLIDO", usuario_id=u["id"], detalle={"motivo": f"Estado {u['estado']}"}, ip=ip, equipo=equipo, resultado="DENEGADO")
             return templates.TemplateResponse("login.html", {"request": request, "error": "Su cuenta no está activa. Contacte al administrador."}, status_code=403)
-        conn.execute("UPDATE usuarios SET ultimo_login = CURRENT_TIMESTAMP WHERE id = ?", (u["id"],))
+        conn.execute("UPDATE usuarios SET ultimo_login = CURRENT_TIMESTAMP, intentos_fallidos = 0 WHERE id = ?", (u["id"],))
         registrar_auditoria(conn, "LOGIN_EXITOSO", usuario_id=u["id"], ip=ip, equipo=equipo, resultado="OK")
     request.session["user_id"] = u["id"]
     request.session["usuario"] = u["usuario"]
     request.session["rol"] = u["rol"]
+    request.session["last_activity"] = datetime.now().timestamp()
     return RedirectResponse("/", status_code=302)
 
 
@@ -347,6 +454,7 @@ def registro_post(
     password: str = Form(...),
     password2: str = Form(...),
     tipo_registro: str = Form(...),
+    _csrf: None = Depends(verificar_csrf),
 ):
     ip = client_ip(request)
     equipo = ua(request)
@@ -383,7 +491,7 @@ def cambiar_password_get(request: Request, user: dict = Depends(require_login)):
 
 
 @app.post("/cambiar_password", response_class=HTMLResponse)
-async def cambiar_password_post(request: Request, user: dict = Depends(require_login)):
+async def cambiar_password_post(request: Request, user: dict = Depends(require_login), _csrf: None = Depends(verificar_csrf)):
     form = await request.form()
 
     actual = (
@@ -606,6 +714,7 @@ def buscar_post(
     paginas_min: int = Form(0),
     paginas_max: int = Form(0),
     user: dict = Depends(require_roles("ADMIN", "JEFE", "BRIGADA")),
+    _csrf: None = Depends(verificar_csrf),
 ):
     require_password_ok(request, user)
     q = (q or "").strip()
@@ -1041,7 +1150,7 @@ def _usuario_row(conn, uid: int):
 
 
 @app.post("/admin/usuario/{uid}/aprobar")
-def admin_aprobar(request: Request, uid: int, user: dict = Depends(require_admin)):
+def admin_aprobar(request: Request, uid: int, user: dict = Depends(require_admin), _csrf: None = Depends(verificar_csrf)):
     with get_db() as conn:
         row = _usuario_row(conn, uid)
         if row and row["estado"] == "PENDIENTE":
@@ -1051,7 +1160,7 @@ def admin_aprobar(request: Request, uid: int, user: dict = Depends(require_admin
 
 
 @app.post("/admin/usuario/{uid}/rechazar")
-def admin_rechazar(request: Request, uid: int, user: dict = Depends(require_admin)):
+def admin_rechazar(request: Request, uid: int, user: dict = Depends(require_admin), _csrf: None = Depends(verificar_csrf)):
     with get_db() as conn:
         row = _usuario_row(conn, uid)
         if row:
@@ -1061,7 +1170,7 @@ def admin_rechazar(request: Request, uid: int, user: dict = Depends(require_admi
 
 
 @app.post("/admin/usuario/{uid}/bloquear")
-def admin_bloquear(request: Request, uid: int, user: dict = Depends(require_admin)):
+def admin_bloquear(request: Request, uid: int, user: dict = Depends(require_admin), _csrf: None = Depends(verificar_csrf)):
     with get_db() as conn:
         row = _usuario_row(conn, uid)
         if row and row["usuario"] != "admin":
@@ -1071,7 +1180,7 @@ def admin_bloquear(request: Request, uid: int, user: dict = Depends(require_admi
 
 
 @app.post("/admin/usuario/{uid}/activar")
-def admin_activar(request: Request, uid: int, user: dict = Depends(require_admin)):
+def admin_activar(request: Request, uid: int, user: dict = Depends(require_admin), _csrf: None = Depends(verificar_csrf)):
     with get_db() as conn:
         row = _usuario_row(conn, uid)
         if row:
@@ -1083,7 +1192,7 @@ def admin_activar(request: Request, uid: int, user: dict = Depends(require_admin
 
 
 @app.post("/admin/usuario/{uid}/rol")
-async def admin_cambiar_rol(request: Request, uid: int, user: dict = Depends(require_admin)):
+async def admin_cambiar_rol(request: Request, uid: int, user: dict = Depends(require_admin), _csrf: None = Depends(verificar_csrf)):
     form = await request.form()
     nuevo_rol = str(form.get("nuevo_rol") or form.get("rol") or "").upper().strip()
 
@@ -1133,7 +1242,7 @@ async def admin_cambiar_rol(request: Request, uid: int, user: dict = Depends(req
 
 
 @app.post("/admin/usuario/{uid}/permiso_reservados")
-def admin_usuario_permiso_reservados(uid: int, request: Request, user: dict = Depends(require_admin)):
+def admin_usuario_permiso_reservados(uid: int, request: Request, user: dict = Depends(require_admin), _csrf: None = Depends(verificar_csrf)):
     with get_db() as conn:
         row = conn.execute("SELECT usuario, permiso_reservados FROM usuarios WHERE id = ?", (uid,)).fetchone()
         if not row:
@@ -1154,7 +1263,7 @@ def admin_usuario_permiso_reservados(uid: int, request: Request, user: dict = De
 
 
 @app.post("/admin/usuario/{uid}/password_temp")
-def admin_password_temp(request: Request, uid: int, user: dict = Depends(require_admin)):
+def admin_password_temp(request: Request, uid: int, user: dict = Depends(require_admin), _csrf: None = Depends(verificar_csrf)):
     with get_db() as conn:
         row = _usuario_row(conn, uid)
         if not row or row["usuario"] == "admin":
@@ -1168,7 +1277,7 @@ def admin_password_temp(request: Request, uid: int, user: dict = Depends(require
 
 
 @app.post("/admin/usuario/{uid}/eliminar")
-def admin_eliminar_usuario(request: Request, uid: int, user: dict = Depends(require_admin)):
+def admin_eliminar_usuario(request: Request, uid: int, user: dict = Depends(require_admin), _csrf: None = Depends(verificar_csrf)):
     with get_db() as conn:
         asegurar_columna_eliminado_usuarios(conn)
 
@@ -1414,7 +1523,7 @@ def admin_reindexar_get(request: Request, user: dict = Depends(require_admin)):
 
 
 @app.post("/admin/config/carpeta_pdf")
-def admin_config_carpeta_pdf(request: Request, user: dict = Depends(require_admin), pdf_dir: str = Form(...)):
+def admin_config_carpeta_pdf(request: Request, user: dict = Depends(require_admin), pdf_dir: str = Form(...), _csrf: None = Depends(verificar_csrf)):
     ruta = Path(pdf_dir.strip())
     if not ruta.exists() or not ruta.is_dir():
         request.session["sigemep_flash"] = f"La carpeta no existe o no es válida: {ruta}"
@@ -1428,12 +1537,12 @@ def admin_config_carpeta_pdf(request: Request, user: dict = Depends(require_admi
 
 
 @app.post("/admin/reindexar")
-def admin_reindexar_legacy(request: Request, user: dict = Depends(require_admin)):
+def admin_reindexar_legacy(request: Request, user: dict = Depends(require_admin), _csrf: None = Depends(verificar_csrf)):
     return RedirectResponse("/admin/reindexar", status_code=302)
 
 
 @app.post("/admin/reindexar/iniciar")
-def admin_reindexar_iniciar(request: Request, user: dict = Depends(require_admin), modo: str = Query("rapida")):
+def admin_reindexar_iniciar(request: Request, user: dict = Depends(require_admin), modo: str = Query("rapida"), _csrf: None = Depends(verificar_csrf)):
     force = modo == "completa"
     with INDEX_JOBS_LOCK:
         for existing_id, job in INDEX_JOBS.items():
@@ -1466,7 +1575,7 @@ def admin_reservados_reindexar_get(request: Request, user: dict = Depends(requir
 
 
 @app.post("/admin/reservados/reindexar/iniciar")
-def admin_reservados_reindexar_iniciar(request: Request, user: dict = Depends(require_admin), modo: str = Query("rapida")):
+def admin_reservados_reindexar_iniciar(request: Request, user: dict = Depends(require_admin), modo: str = Query("rapida"), _csrf: None = Depends(verificar_csrf)):
     force = modo == "completa"
     with RESERVADOS_INDEX_JOBS_LOCK:
         for existing_id, job in RESERVADOS_INDEX_JOBS.items():
@@ -1504,6 +1613,7 @@ def reservados_post(
     paginas_min: int = Form(0),
     paginas_max: int = Form(0),
     user: dict = Depends(require_reservados),
+    _csrf: None = Depends(verificar_csrf),
 ):
     require_password_ok(request, user)
     q = (q or "").strip()
@@ -1707,6 +1817,7 @@ async def nuevo_memorando_preview(
     dependencia: str = Form(""),
     magistrado: str = Form(""),
     resena: str = Form(...),
+    _csrf: None = Depends(verificar_csrf),
 ):
     import fitz as _fitz
     campos = {
@@ -1750,6 +1861,7 @@ async def nuevo_memorando_guardar(
     dependencia: str = Form(""),
     magistrado: str = Form(""),
     resena: str = Form(...),
+    _csrf: None = Depends(verificar_csrf),
 ):
     campos = {
         "nro": nro, "anio": anio, "iniciales": iniciales,
@@ -1807,6 +1919,7 @@ def insertar_memorando_verificar_hash(
     request: Request,
     user: dict = Depends(require_roles("BRIGADA")),
     hash_sha256: str = Form(...),
+    _csrf: None = Depends(verificar_csrf),
 ):
     require_password_ok(request, user)
     h = hash_sha256.strip().lower()
@@ -1833,11 +1946,28 @@ def insertar_memorando_verificar_hash(
     return JSONResponse({"existe": False})
 
 
+async def _leer_archivo_con_limite(archivo: UploadFile, limite_bytes: int) -> bytes:
+    """Lee el UploadFile en bloques, abortando apenas se supera el límite,
+    para no acumular en memoria un archivo arbitrariamente grande."""
+    partes: list[bytes] = []
+    total = 0
+    while True:
+        bloque = await archivo.read(1024 * 1024)
+        if not bloque:
+            break
+        total += len(bloque)
+        if total > limite_bytes:
+            raise HTTPException(413, detail=f"El archivo supera el límite de {MAX_UPLOAD_MB} MB.")
+        partes.append(bloque)
+    return b"".join(partes)
+
+
 @app.post("/brigada/insertar_memorando/guardar")
 async def insertar_memorando_guardar(
     request: Request,
     user: dict = Depends(require_roles("BRIGADA")),
     archivo: UploadFile = File(...),
+    _csrf: None = Depends(verificar_csrf),
 ):
     require_password_ok(request, user)
 
@@ -1845,7 +1975,7 @@ async def insertar_memorando_guardar(
     if not nombre_original.lower().endswith(".pdf"):
         raise HTTPException(400, detail="Solo se aceptan archivos PDF.")
 
-    contenido = await archivo.read()
+    contenido = await _leer_archivo_con_limite(archivo, MAX_UPLOAD_BYTES)
     if len(contenido) < 5:
         raise HTTPException(400, detail="El archivo está vacío o no es un PDF válido.")
 
@@ -1939,6 +2069,7 @@ def insertar_memorando_avisar_admin(
     user: dict = Depends(require_roles("BRIGADA")),
     hash_sha256: str = Form(...),
     nombre_archivo: str = Form(""),
+    _csrf: None = Depends(verificar_csrf),
 ):
     require_password_ok(request, user)
     h = hash_sha256.strip().lower()[:64]
@@ -2006,6 +2137,7 @@ def api_alertas_pendientes(user: dict = Depends(require_admin)):
 @app.post("/admin/alertas_revision/{alerta_id}/marcar_revisado")
 def admin_marcar_alerta_revisado(
     alerta_id: int, request: Request, user: dict = Depends(require_admin),
+    _csrf: None = Depends(verificar_csrf),
 ):
     with get_db() as conn:
         alerta = conn.execute(

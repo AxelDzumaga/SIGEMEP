@@ -1962,6 +1962,40 @@ async def _leer_archivo_con_limite(archivo: UploadFile, limite_bytes: int) -> by
     return b"".join(partes)
 
 
+@app.post("/brigada/insertar_memorando/verificar_archivo")
+async def insertar_memorando_verificar_archivo(
+    request: Request,
+    user: dict = Depends(require_roles("BRIGADA")),
+    archivo: UploadFile = File(...),
+    _csrf: None = Depends(verificar_csrf),
+):
+    require_password_ok(request, user)
+    contenido = await _leer_archivo_con_limite(archivo, MAX_UPLOAD_BYTES)
+    if len(contenido) < 5:
+        return JSONResponse({"error": "El archivo está vacío o no es un PDF válido."}, status_code=400)
+    hash_sha256 = hashlib.sha256(contenido).hexdigest()
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT m.nombre_archivo, m.fecha_indexado, u.usuario
+            FROM memorandos m
+            LEFT JOIN usuarios u ON u.id = m.usuario_id
+            WHERE m.hash_sha256 = ? AND m.activo = 1
+            LIMIT 1
+            """,
+            (hash_sha256,),
+        ).fetchone()
+    if row:
+        return JSONResponse({
+            "existe": True,
+            "hash": hash_sha256,
+            "nombre_archivo": row["nombre_archivo"],
+            "fecha_subida": row["fecha_indexado"],
+            "usuario": row["usuario"] or "—",
+        })
+    return JSONResponse({"existe": False, "hash": hash_sha256})
+
+
 @app.post("/brigada/insertar_memorando/guardar")
 async def insertar_memorando_guardar(
     request: Request,

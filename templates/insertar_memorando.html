@@ -312,29 +312,36 @@ async function _procesar(f) {
   _setEstado('computing');
 
   try {
-    // 1. Calcular SHA-256 en el cliente
-    const buf     = await f.arrayBuffer();
-    const hashBuf = await crypto.subtle.digest('SHA-256', buf);
-    const hex     = Array.from(new Uint8Array(hashBuf))
-      .map(b => b.toString(16).padStart(2,'0')).join('');
-    _hash = hex;
-    document.getElementById('ins-fhash').textContent = 'SHA-256: ' + hex.slice(0,16) + '…' + hex.slice(-8);
+    if (window.crypto && window.crypto.subtle) {
+      // 1. Calcular SHA-256 en el cliente (solo en contextos seguros HTTPS)
+      const buf     = await f.arrayBuffer();
+      const hashBuf = await window.crypto.subtle.digest('SHA-256', buf);
+      const hex     = Array.from(new Uint8Array(hashBuf))
+        .map(b => b.toString(16).padStart(2,'0')).join('');
+      _hash = hex;
+      document.getElementById('ins-fhash').textContent = 'SHA-256: ' + hex.slice(0,16) + '…' + hex.slice(-8);
 
-    // 2. Verificar contra la DB
-    _setEstado('verifying');
-    const fd = new FormData();
-    fd.append('hash_sha256', hex);
-    const resp = await fetch('/brigada/insertar_memorando/verificar_hash', { method:'POST', body:fd, headers:{'X-CSRF-Token': window.SIGEMEP_CSRF_TOKEN} });
-    const data = await resp.json();
+      // 2. Verificar contra la DB
+      _setEstado('verifying');
+      const fd = new FormData();
+      fd.append('hash_sha256', hex);
+      const resp = await fetch('/brigada/insertar_memorando/verificar_hash', { method:'POST', body:fd, headers:{'X-CSRF-Token': window.SIGEMEP_CSRF_TOKEN} });
+      const data = await resp.json();
 
-    if(!resp.ok) { throw new Error(data.error || 'Error en verificación'); }
+      if(!resp.ok) { throw new Error(data.error || 'Error en verificación'); }
 
-    if(data.existe) {
-      document.getElementById('dup-nombre').textContent  = data.nombre_archivo || '—';
-      document.getElementById('dup-fecha').textContent   = data.fecha_subida   || '—';
-      document.getElementById('dup-usuario').textContent = data.usuario        || '—';
-      _setEstado('dup');
+      if(data.existe) {
+        document.getElementById('dup-nombre').textContent  = data.nombre_archivo || '—';
+        document.getElementById('dup-fecha').textContent   = data.fecha_subida   || '—';
+        document.getElementById('dup-usuario').textContent = data.usuario        || '—';
+        _setEstado('dup');
+      } else {
+        _setEstado('clean');
+      }
     } else {
+      // crypto.subtle no disponible (contexto HTTP): el servidor verifica duplicados al guardar
+      _hash = '';
+      document.getElementById('ins-fhash').textContent = 'Verificación en servidor';
       _setEstado('clean');
     }
   } catch(e) {
@@ -345,7 +352,7 @@ async function _procesar(f) {
 
 // ── Guardar ──────────────────────────────────────────────────────
 window.insGuardar = async function() {
-  if(!_archivo || !_hash) return;
+  if(!_archivo || _hash === null) return;
   const btn = document.getElementById('ins-btn-save');
   const pw  = document.getElementById('ins-prog-wrap');
 

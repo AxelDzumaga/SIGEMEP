@@ -317,28 +317,34 @@ def _ensure_memorando_columns(conn, tabla: str = "memorandos") -> None:
     Si ya existen, ignora el error.
     """
     tabla = _validar_tabla_indexable(tabla)
-    for columna_sql in ["tamanio_bytes INTEGER", "mtime INTEGER"]:
+    for columna_sql in ["tamanio_bytes INTEGER", "mtime INTEGER", "hash_sha256 TEXT"]:
         try:
             conn.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna_sql}")
         except Exception:
             pass
 
 
-def _procesar_pdf_contenido(abs_path: Path, preview_path: Path) -> tuple[str, int]:
-    """Extrae texto, cuenta páginas y genera preview en un solo fitz.open."""
-    doc = fitz.open(abs_path)
+def _procesar_pdf_contenido(abs_path: Path, preview_path: Path) -> tuple[str, int, str]:
+    """Extrae texto, cuenta páginas, genera preview y calcula SHA-256 en un solo open."""
+    raw = abs_path.read_bytes()
+    sha256 = hashlib.sha256(raw).hexdigest()
+    doc = fitz.open(stream=raw, filetype="pdf")
     try:
         parts = [doc.load_page(i).get_text("text") or "" for i in range(len(doc))]
         n_pages = len(doc)
         meta = doc.metadata or {}
+        page0 = doc.load_page(0)
+        mat = fitz.Matrix(2.0, 2.0)
+        pix = page0.get_pixmap(matrix=mat, alpha=False)
+        preview_path.parent.mkdir(parents=True, exist_ok=True)
+        pix.save(preview_path.as_posix())
     finally:
         doc.close()
     meta_lines = [f"{k}: {v}" for k, v in (meta or {}).items() if v]
     texto = "\n".join(parts)
     if meta_lines:
         texto += "\n" + "\n".join(meta_lines)
-    renderizar_primera_hoja_base(abs_path, preview_path)
-    return texto, n_pages
+    return texto, n_pages, sha256
 
 
 def indexar_memorandos(
@@ -417,7 +423,7 @@ def indexar_memorandos(
                 size, mtime = _file_fingerprint(abs_path)
 
                 row = conn.execute(
-                    f"SELECT id, tamanio_bytes, mtime FROM {tabla} WHERE ruta_archivo = ?",
+                    f"SELECT id, tamanio_bytes, mtime, hash_sha256 FROM {tabla} WHERE ruta_archivo = ?",
                     (rel,)
                 ).fetchone()
 
@@ -428,6 +434,7 @@ def indexar_memorandos(
                     and not force
                     and row["tamanio_bytes"] == size
                     and row["mtime"] == mtime
+                    and row["hash_sha256"]
                 ):
                     if tabla == "memorandos":
                         conn.execute(
@@ -446,7 +453,7 @@ def indexar_memorandos(
 
                     future = executor.submit(_procesar_pdf_contenido, abs_path, preview_path)
                     try:
-                        texto, n_pages = future.result(timeout=_PDF_TIMEOUT)
+                        texto, n_pages, sha256 = future.result(timeout=_PDF_TIMEOUT)
                     except concurrent.futures.TimeoutError:
                         errores += 1
                         _safe_progress(progress_callback, {
@@ -477,7 +484,8 @@ def indexar_memorandos(
                                     activo = 1,
                                     tamanio_bytes = ?,
                                     mtime = ?,
-                                    fecha_hecho = ?
+                                    fecha_hecho = ?,
+                                    hash_sha256 = ?
                                 WHERE id = ?
                                 """,
                                 (
@@ -488,6 +496,7 @@ def indexar_memorandos(
                                     size,
                                     mtime,
                                     extraer_fecha_hecho(abs_path.name),
+                                    sha256,
                                     row["id"],
                                 ),
                             )
@@ -502,7 +511,8 @@ def indexar_memorandos(
                                     fecha_indexado = CURRENT_TIMESTAMP,
                                     activo = 1,
                                     tamanio_bytes = ?,
-                                    mtime = ?
+                                    mtime = ?,
+                                    hash_sha256 = ?
                                 WHERE id = ?
                                 """,
                                 (
@@ -512,6 +522,7 @@ def indexar_memorandos(
                                     preview_path.as_posix(),
                                     size,
                                     mtime,
+                                    sha256,
                                     row["id"],
                                 ),
                             )
@@ -529,8 +540,9 @@ def indexar_memorandos(
                                     activo,
                                     tamanio_bytes,
                                     mtime,
-                                    fecha_hecho
-                                ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
+                                    fecha_hecho,
+                                    hash_sha256
+                                ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
                                 """,
                                 (
                                     abs_path.name,
@@ -541,6 +553,7 @@ def indexar_memorandos(
                                     size,
                                     mtime,
                                     extraer_fecha_hecho(abs_path.name),
+                                    sha256,
                                 ),
                             )
                         else:
@@ -554,8 +567,9 @@ def indexar_memorandos(
                                     primera_hoja_img,
                                     activo,
                                     tamanio_bytes,
-                                    mtime
-                                ) VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+                                    mtime,
+                                    hash_sha256
+                                ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
                                 """,
                                 (
                                     abs_path.name,
@@ -565,6 +579,7 @@ def indexar_memorandos(
                                     preview_path.as_posix(),
                                     size,
                                     mtime,
+                                    sha256,
                                 ),
                             )
                         nuevos += 1

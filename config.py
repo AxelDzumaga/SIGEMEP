@@ -14,8 +14,8 @@ if platform.system() == "Windows":
     _DEFAULT_PDF_DIR = Path(r"C:\Users\SIGEMEP\Desktop\REDCOMPARTIDA")
     _DEFAULT_RESERVADOS_DIR = Path(r"C:\Users\SIGEMEP\Desktop\INFORMES RV")
 else:
-    _DEFAULT_PDF_DIR = BASE_DIR / "data" / "REDCOMPARTIDA"
-    _DEFAULT_RESERVADOS_DIR = BASE_DIR / "data" / "INFORMES_RV"
+    _DEFAULT_PDF_DIR = Path("/home/sigemep/memorandos")
+    _DEFAULT_RESERVADOS_DIR = Path("/home/sigemep/reservados")
 
 DEFAULT_PDF_DIR = os.environ.get("SIGEMEP_PDF_DIR", str(_DEFAULT_PDF_DIR))
 PDF_BASE_DIR = Path(DEFAULT_PDF_DIR)

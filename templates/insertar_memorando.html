@@ -249,9 +249,29 @@ let _hash    = null;
 const dz = document.getElementById('ins-dz');
 const fi = document.getElementById('ins-input');
 
-['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('over'); }));
-['dragleave','drop'].forEach(ev => dz.addEventListener(ev, () => dz.classList.remove('over')));
-dz.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if(f) _procesar(f); });
+function _dzDrop(e) {
+  e.preventDefault();
+  dz.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if(f) _procesar(f);
+}
+function _dzLeave(e) {
+  // relatedTarget: elemento al que entra el cursor; si sigue dentro de dz no es un leave real
+  if(!dz.contains(e.relatedTarget)) dz.classList.remove('over');
+}
+
+// Listeners en el input (cubre toda la zona): stopPropagation evita doble disparo en dz
+fi.addEventListener('dragenter', e => { e.preventDefault(); e.stopPropagation(); dz.classList.add('over'); });
+fi.addEventListener('dragover',  e => { e.preventDefault(); e.stopPropagation(); });
+fi.addEventListener('dragleave', e => { e.stopPropagation(); _dzLeave(e); });
+fi.addEventListener('drop',      e => { e.stopPropagation(); _dzDrop(e); });
+
+// Listeners en dz como fallback (por si el input no propaga en algún browser)
+dz.addEventListener('dragenter', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragover',  e => { e.preventDefault(); });
+dz.addEventListener('dragleave', _dzLeave);
+dz.addEventListener('drop',      _dzDrop);
+
 fi.addEventListener('change', () => { if(fi.files[0]) _procesar(fi.files[0]); });
 
 // ── Utilities ────────────────────────────────────────────────────

@@ -1105,9 +1105,11 @@ def asegurar_columna_eliminado_usuarios(conn):
         pass
 
 @app.get("/admin/usuarios", response_class=HTMLResponse)
-def admin_usuarios(request: Request, user: dict = Depends(require_admin), q: str = "", rol: str = "", estado: str = ""):
+def admin_usuarios(request: Request, user: dict = Depends(require_roles("ADMIN", "JEFE")), q: str = "", rol: str = "", estado: str = ""):
+    require_password_ok(request, user)
     flash = request.session.pop("sigemep_flash", None)
     err = request.query_params.get("error")
+    es_admin = user["rol"] == "ADMIN"
     sql = "SELECT * FROM usuarios WHERE 1=1"
     if not estado:
         sql += " AND COALESCE(eliminado, 0) = 0"
@@ -1125,7 +1127,7 @@ def admin_usuarios(request: Request, user: dict = Depends(require_admin), q: str
     with get_db() as conn:
         asegurar_columna_eliminado_usuarios(conn)
         rows = conn.execute(sql, params).fetchall()
-    return templates.TemplateResponse("usuarios.html", {"request": request, "user": user, "usuarios": [dict(r) for r in rows], "flash": flash, "query_error": err, "q": q, "rol": rol, "estado": estado})
+    return templates.TemplateResponse("usuarios.html", {"request": request, "user": user, "usuarios": [dict(r) for r in rows], "flash": flash, "query_error": err, "q": q, "rol": rol, "estado": estado, "es_admin": es_admin})
 
 
 @app.get("/admin/usuario/{uid}/movimientos", response_class=HTMLResponse)

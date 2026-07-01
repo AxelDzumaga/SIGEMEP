@@ -30,6 +30,7 @@
 <a href="/dashboard/jefe" class="nav-item{% if p == '/dashboard/jefe' %} active{% endif %}"><i class="fa-solid fa-house"></i><span>Inicio</span></a>
 <a href="/buscar" class="nav-item{% if p.startswith('/buscar') %} active{% endif %}"><i class="fa-solid fa-magnifying-glass"></i><span>Buscar memorandos</span></a>
 <a href="/jefe/brigada_movimientos" class="nav-item{% if p.startswith('/jefe/brigada_movimientos') %} active{% endif %}"><i class="fa-solid fa-user-shield"></i><span>Movimientos Brigada</span></a>
+<a href="/admin/usuarios" class="nav-item{% if p.startswith('/admin/usuarios') %} active{% endif %}"><i class="fa-solid fa-users-gear"></i><span>Usuarios</span></a>
 {% elif user.rol == 'BRIGADA' %}
 <a href="/dashboard/brigada" class="nav-item{% if p == '/dashboard/brigada' %} active{% endif %}"><i class="fa-solid fa-house"></i><span>Inicio</span></a>
 <a href="/buscar" class="nav-item{% if p.startswith('/buscar') %} active{% endif %}"><i class="fa-solid fa-magnifying-glass"></i><span>Buscar memorandos</span></a>

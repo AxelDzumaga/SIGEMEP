@@ -17,34 +17,139 @@
 .users-card{background:linear-gradient(145deg,rgba(18,24,28,.96),rgba(7,10,12,.99));border:1px solid rgba(255,255,255,.10);border-radius:26px;padding:16px;box-shadow:var(--shadow);overflow:auto}.users-table{width:100%;min-width:1120px;border-collapse:separate;border-spacing:0}.users-table th{color:#ffb36b;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.45px;padding:14px 12px;border-bottom:1px solid rgba(255,115,0,.32);white-space:nowrap}.users-table td{color:#e5e7eb;padding:13px 12px;border-bottom:1px solid rgba(255,255,255,.075);vertical-align:middle;font-size:13px}.users-table tr:hover td{background:rgba(255,115,0,.045)}
 .role-badge,.state-badge,.pw-badge{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:950;white-space:nowrap}.role-admin{background:rgba(255,115,0,.16);color:#ffb36b}.role-jefe{background:rgba(245,158,11,.16);color:#fbbf24}.role-brigada{background:rgba(249,115,22,.16);color:#fb923c}.state-activo{background:rgba(34,197,94,.16);color:#86efac}.state-pendiente{background:rgba(245,158,11,.16);color:#fbbf24}.state-bloqueado{background:rgba(239,68,68,.16);color:#fca5a5}.state-rechazado,.state-eliminado{background:rgba(107,114,128,.18);color:#d1d5db}.pw-yes{background:rgba(245,158,11,.16);color:#fbbf24}.pw-no{background:rgba(34,197,94,.16);color:#86efac}
 .user-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.mini-btn{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff!important;border-radius:12px;min-height:34px;padding:8px 10px;font-size:12px;font-weight:950;text-decoration:none!important;display:inline-flex;align-items:center;gap:7px;cursor:pointer}.mini-btn:hover{transform:translateY(-1px);background:rgba(255,115,0,.12);border-color:rgba(255,115,0,.30)}.mini-green{background:rgba(34,197,94,.14);border-color:rgba(34,197,94,.30);color:#86efac!important}.mini-red{background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.30);color:#fca5a5!important}.mini-orange{background:rgba(255,115,0,.14);border-color:rgba(255,115,0,.30);color:#ffb36b!important}
-.role-form{display:inline-flex;gap:7px;align-items:center}.role-form select{background:rgba(255,255,255,.055)!important;border:1px solid rgba(255,255,255,.13)!important;color:#fff!important;border-radius:12px!important;padding:8px 9px!important;font-weight:900;font-size:12px}.role-form option{background:#111;color:#fff}@media(max-width:900px){.users-hero{flex-direction:column}.users-hero::after{display:none}.users-header-userbox{width:100%;justify-content:space-between}.users-filter{grid-template-columns:1fr}}
+.role-form{display:inline-flex;gap:7px;align-items:center}.role-form select{background:rgba(255,255,255,.055)!important;border:1px solid rgba(255,255,255,.13)!important;color:#fff!important;border-radius:12px!important;padding:8px 9px!important;font-weight:900;font-size:12px}.role-form option{background:#111;color:#fff}
+/* Tabs de rol */
+.role-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.role-tab{min-height:38px;padding:8px 16px;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.055);color:#aeb7c4!important;font-size:12px;font-weight:950;text-decoration:none!important;display:inline-flex;align-items:center;gap:7px;transition:all .15s ease}
+.role-tab:hover{background:rgba(255,115,0,.10);border-color:rgba(255,115,0,.28);color:#ffb36b!important}
+.role-tab.active{background:rgba(255,115,0,.18);border-color:rgba(255,115,0,.50);color:#ffb36b!important;box-shadow:0 0 14px rgba(255,115,0,.12)}
+/* Badge solo lectura reservados */
+.reservados-si{background:rgba(34,197,94,.14);border:1px solid rgba(34,197,94,.30);color:#86efac;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:950;display:inline-flex;align-items:center;gap:5px}
+.reservados-no{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#9ca3af;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:950;display:inline-flex;align-items:center;gap:5px}
+.solo-lectura-badge{background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.25);color:#a5b4fc;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:950;display:inline-flex;align-items:center;gap:5px}
+@media(max-width:900px){.users-hero{flex-direction:column}.users-hero::after{display:none}.users-header-userbox{width:100%;justify-content:space-between}.users-filter{grid-template-columns:1fr}}
 </style>
 {% endblock %}
 
 {% block content %}
 <section class="users-page">
 <section class="users-hero">
-<div><span class="section-tag"><i class="fa-solid fa-users-gear"></i> Administración</span><h1>Usuarios registrados</h1><p>Control de usuarios, roles, estados, solicitudes, contraseñas temporales y eliminación lógica.</p></div>
+<div><span class="section-tag"><i class="fa-solid fa-users-gear"></i> Administración</span><h1>Usuarios registrados</h1><p>{% if es_admin %}Control de usuarios, roles, estados, solicitudes, contraseñas temporales y eliminación lógica.{% else %}Vista de usuarios del sistema. Solo lectura — las modificaciones requieren rol ADMIN.{% endif %}</p></div>
 <div class="users-header-userbox"><div><strong>{{ user.usuario }}</strong><span>{{ user.rol }}</span></div><div class="users-header-avatar">{{ user.usuario[0]|upper if user.usuario else "U" }}</div></div>
 </section>
+
 {% if flash %}<div class="users-alert"><i class="fa-solid fa-circle-info"></i> {{ flash }}</div>{% endif %}
 {% if query_error == 'cupo' %}<div class="users-alert"><i class="fa-solid fa-triangle-exclamation"></i> No hay cupo disponible para ese rol.</div>{% endif %}
+
+<!-- Tabs de rol -->
+<div class="role-tabs">
+  <a href="/admin/usuarios?q={{ q or '' }}&estado={{ estado or '' }}" class="role-tab {% if not rol %}active{% endif %}"><i class="fa-solid fa-users"></i> Todos</a>
+  <a href="/admin/usuarios?q={{ q or '' }}&rol=JEFE&estado={{ estado or '' }}" class="role-tab {% if rol == 'JEFE' %}active{% endif %}"><i class="fa-solid fa-user-tie"></i> JEFE</a>
+  <a href="/admin/usuarios?q={{ q or '' }}&rol=BRIGADA&estado={{ estado or '' }}" class="role-tab {% if rol == 'BRIGADA' %}active{% endif %}"><i class="fa-solid fa-user-shield"></i> BRIGADA</a>
+  <a href="/admin/usuarios?q={{ q or '' }}&rol=ADMIN&estado={{ estado or '' }}" class="role-tab {% if rol == 'ADMIN' %}active{% endif %}"><i class="fa-solid fa-shield-halved"></i> ADMIN</a>
+</div>
+
 <form method="get" action="/admin/usuarios" class="users-filter">
 <label>Buscar<input type="text" name="q" value="{{ q or '' }}" placeholder="Usuario, nombre o DNI/legajo"></label>
 <label>Rol<select name="rol"><option value="" {% if not rol %}selected{% endif %}>Todos</option><option value="ADMIN" {% if rol == 'ADMIN' %}selected{% endif %}>ADMIN</option><option value="JEFE" {% if rol == 'JEFE' %}selected{% endif %}>JEFE</option><option value="BRIGADA" {% if rol == 'BRIGADA' %}selected{% endif %}>BRIGADA</option></select></label>
 <label>Estado<select name="estado"><option value="" {% if not estado %}selected{% endif %}>Activos/no eliminados</option><option value="ACTIVO" {% if estado == 'ACTIVO' %}selected{% endif %}>ACTIVO</option><option value="PENDIENTE" {% if estado == 'PENDIENTE' %}selected{% endif %}>PENDIENTE</option><option value="BLOQUEADO" {% if estado == 'BLOQUEADO' %}selected{% endif %}>BLOQUEADO</option><option value="RECHAZADO" {% if estado == 'RECHAZADO' %}selected{% endif %}>RECHAZADO</option><option value="ELIMINADO" {% if estado == 'ELIMINADO' %}selected{% endif %}>ELIMINADO</option></select></label>
 <button type="submit" class="mini-btn mini-orange"><i class="fa-solid fa-filter"></i> Filtrar</button>
 </form>
-<section class="users-card"><table class="users-table"><thead><tr><th>ID</th><th>Usuario</th><th>Nombre</th><th>DNI / Legajo</th><th>Rol</th><th>Estado</th><th>Último login</th><th>Cambiar clave</th><th>Reservados</th><th>Acciones</th></tr></thead><tbody>
+
+<section class="users-card">
+<table class="users-table">
+<thead><tr>
+  <th>ID</th>
+  <th>Usuario</th>
+  <th>Nombre</th>
+  <th>DNI / Legajo</th>
+  <th>Rol</th>
+  <th>Estado</th>
+  <th>Último login</th>
+  <th>Cambiar clave</th>
+  <th>Reservados</th>
+  {% if es_admin %}<th>Acciones</th>{% endif %}
+</tr></thead>
+<tbody>
 {% for u in usuarios %}
 <tr>
-<td>{{ u.id }}</td><td><strong>{{ u.usuario }}</strong></td><td>{{ u.nombre_apellido or '—' }}</td><td>{{ u.dni_legajo or '—' }}</td>
-<td>{% if u.usuario == 'admin' %}<span class="role-badge role-admin">ADMIN</span>{% elif u.estado == 'ELIMINADO' %}<span class="role-badge role-{{ (u.rol or '')|lower }}">{{ u.rol }}</span>{% else %}<form method="post" action="/admin/usuario/{{ u.id }}/rol" class="role-form"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><select name="nuevo_rol"><option value="ADMIN" {% if u.rol == 'ADMIN' %}selected{% endif %}>ADMIN</option><option value="JEFE" {% if u.rol == 'JEFE' %}selected{% endif %}>JEFE</option><option value="BRIGADA" {% if u.rol == 'BRIGADA' %}selected{% endif %}>BRIGADA</option></select><button type="submit" class="mini-btn mini-orange"><i class="fa-solid fa-floppy-disk"></i> Rol</button></form>{% endif %}</td>
-<td><span class="state-badge state-{{ (u.estado or '')|lower }}">{{ u.estado }}</span></td><td>{{ u.ultimo_login or '—' }}</td><td>{% if u.debe_cambiar_password %}<span class="pw-badge pw-yes">Sí</span>{% else %}<span class="pw-badge pw-no">No</span>{% endif %}</td>
-<td>{% if u.usuario == 'admin' %}<span class="pw-badge pw-no">Automático</span>{% else %}<form method="post" action="/admin/usuario/{{ u.id }}/permiso_reservados"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><button type="submit" class="mini-btn {{ 'mini-green' if u.permiso_reservados else '' }}"><i class="fa-solid {{ 'fa-lock-open' if u.permiso_reservados else 'fa-lock' }}"></i> {{ 'Sí' if u.permiso_reservados else 'No' }}</button></form>{% endif %}</td>
-<td><div class="user-actions"><a href="/admin/usuario/{{ u.id }}/movimientos" class="mini-btn"><i class="fa-solid fa-clock-rotate-left"></i> Movimientos</a>{% if u.usuario != 'admin' and u.estado != 'ELIMINADO' %}{% if u.estado == 'PENDIENTE' %}<form method="post" action="/admin/usuario/{{ u.id }}/aprobar"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><button type="submit" class="mini-btn mini-green"><i class="fa-solid fa-check"></i> Aprobar</button></form><form method="post" action="/admin/usuario/{{ u.id }}/rechazar" onsubmit="return confirm('¿Rechazar esta solicitud?');"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><button type="submit" class="mini-btn mini-red"><i class="fa-solid fa-xmark"></i> Rechazar</button></form>{% endif %}{% if u.estado == 'ACTIVO' %}<form method="post" action="/admin/usuario/{{ u.id }}/bloquear" onsubmit="return confirm('¿Bloquear usuario {{ u.usuario }}?');"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><button type="submit" class="mini-btn mini-red"><i class="fa-solid fa-lock"></i> Bloquear</button></form>{% elif u.estado == 'BLOQUEADO' %}<form method="post" action="/admin/usuario/{{ u.id }}/activar"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><button type="submit" class="mini-btn mini-green"><i class="fa-solid fa-unlock"></i> Activar</button></form>{% endif %}<form method="post" action="/admin/usuario/{{ u.id }}/password_temp" onsubmit="return confirm('¿Generar contraseña temporal para {{ u.usuario }}?');"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><button type="submit" class="mini-btn mini-orange"><i class="fa-solid fa-key"></i> Clave temporal</button></form><form method="post" action="/admin/usuario/{{ u.id }}/eliminar" onsubmit="return confirm('¿Eliminar el usuario {{ u.usuario }}? Esta acción lo ocultará del listado principal.');"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><button type="submit" class="mini-btn mini-red"><i class="fa-solid fa-trash"></i> Eliminar</button></form>{% endif %}</div></td>
+<td>{{ u.id }}</td>
+<td><strong>{{ u.usuario }}</strong></td>
+<td>{{ u.nombre_apellido or '—' }}</td>
+<td>{{ u.dni_legajo or '—' }}</td>
+
+<!-- Columna Rol -->
+<td>
+  {% if not es_admin or u.usuario == 'admin' or u.estado == 'ELIMINADO' %}
+    <span class="role-badge role-{{ (u.rol or '')|lower }}">{{ u.rol }}</span>
+  {% else %}
+    <form method="post" action="/admin/usuario/{{ u.id }}/rol" class="role-form">
+      <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+      <select name="nuevo_rol">
+        <option value="ADMIN" {% if u.rol == 'ADMIN' %}selected{% endif %}>ADMIN</option>
+        <option value="JEFE" {% if u.rol == 'JEFE' %}selected{% endif %}>JEFE</option>
+        <option value="BRIGADA" {% if u.rol == 'BRIGADA' %}selected{% endif %}>BRIGADA</option>
+      </select>
+      <button type="submit" class="mini-btn mini-orange"><i class="fa-solid fa-floppy-disk"></i> Rol</button>
+    </form>
+  {% endif %}
+</td>
+
+<td><span class="state-badge state-{{ (u.estado or '')|lower }}">{{ u.estado }}</span></td>
+<td>{{ u.ultimo_login or '—' }}</td>
+<td>{% if u.debe_cambiar_password %}<span class="pw-badge pw-yes">Sí</span>{% else %}<span class="pw-badge pw-no">No</span>{% endif %}</td>
+
+<!-- Columna Reservados -->
+<td>
+  {% if u.usuario == 'admin' %}
+    <span class="pw-badge pw-no">Automático</span>
+  {% elif es_admin %}
+    <form method="post" action="/admin/usuario/{{ u.id }}/permiso_reservados">
+      <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+      <button type="submit" class="mini-btn {{ 'mini-green' if u.permiso_reservados else '' }}">
+        <i class="fa-solid {{ 'fa-lock-open' if u.permiso_reservados else 'fa-lock' }}"></i>
+        {{ 'Sí' if u.permiso_reservados else 'No' }}
+      </button>
+    </form>
+  {% else %}
+    {% if u.permiso_reservados %}
+      <span class="reservados-si"><i class="fa-solid fa-lock-open"></i> Sí</span>
+    {% else %}
+      <span class="reservados-no"><i class="fa-solid fa-lock"></i> No</span>
+    {% endif %}
+  {% endif %}
+</td>
+
+<!-- Columna Acciones (solo ADMIN) -->
+{% if es_admin %}
+<td><div class="user-actions">
+  <a href="/admin/usuario/{{ u.id }}/movimientos" class="mini-btn"><i class="fa-solid fa-clock-rotate-left"></i> Movimientos</a>
+  {% if u.usuario != 'admin' and u.estado != 'ELIMINADO' %}
+    {% if u.estado == 'PENDIENTE' %}
+      <form method="post" action="/admin/usuario/{{ u.id }}/aprobar"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><button type="submit" class="mini-btn mini-green"><i class="fa-solid fa-check"></i> Aprobar</button></form>
+      <form method="post" action="/admin/usuario/{{ u.id }}/rechazar" onsubmit="return confirm('¿Rechazar esta solicitud?');"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><button type="submit" class="mini-btn mini-red"><i class="fa-solid fa-xmark"></i> Rechazar</button></form>
+    {% endif %}
+    {% if u.estado == 'ACTIVO' %}
+      <form method="post" action="/admin/usuario/{{ u.id }}/bloquear" onsubmit="return confirm('¿Bloquear usuario {{ u.usuario }}?');"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><button type="submit" class="mini-btn mini-red"><i class="fa-solid fa-lock"></i> Bloquear</button></form>
+    {% elif u.estado == 'BLOQUEADO' %}
+      <form method="post" action="/admin/usuario/{{ u.id }}/activar"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><button type="submit" class="mini-btn mini-green"><i class="fa-solid fa-unlock"></i> Activar</button></form>
+    {% endif %}
+    <form method="post" action="/admin/usuario/{{ u.id }}/password_temp" onsubmit="return confirm('¿Generar contraseña temporal para {{ u.usuario }}?');"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><button type="submit" class="mini-btn mini-orange"><i class="fa-solid fa-key"></i> Clave temporal</button></form>
+    <form method="post" action="/admin/usuario/{{ u.id }}/eliminar" onsubmit="return confirm('¿Eliminar el usuario {{ u.usuario }}? Esta acción lo ocultará del listado principal.');"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><button type="submit" class="mini-btn mini-red"><i class="fa-solid fa-trash"></i> Eliminar</button></form>
+  {% endif %}
+</div></td>
+{% endif %}
 </tr>
-{% else %}<tr><td colspan="10"><div style="padding:34px;text-align:center;color:#9ca3af;"><i class="fa-solid fa-inbox" style="font-size:34px;color:#ff7300;"></i><div style="margin-top:10px;font-weight:900;color:#fff;">No hay usuarios para mostrar.</div></div></td></tr>{% endfor %}
-</tbody></table></section>
+{% else %}
+<tr><td colspan="{% if es_admin %}10{% else %}9{% endif %}">
+  <div style="padding:34px;text-align:center;color:#9ca3af;">
+    <i class="fa-solid fa-inbox" style="font-size:34px;color:#ff7300;"></i>
+    <div style="margin-top:10px;font-weight:900;color:#fff;">No hay usuarios para mostrar.</div>
+  </div>
+</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</section>
 </section>
 {% endblock %}

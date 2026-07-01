@@ -188,8 +188,12 @@
         <div class="ins-dup-row"><span class="lbl">Fecha:</span><span class="val" id="dup-fecha">—</span></div>
         <div class="ins-dup-row"><span class="lbl">Usuario:</span><span class="val" id="dup-usuario">—</span></div>
       </div>
-      <button type="button" class="ins-btn ins-btn-warn" id="ins-btn-avisar" onclick="insAvisarAdmin()">
-        <i class="fa-solid fa-bell"></i> Avisar al Administrador
+      <div class="ins-panel ins-panel-row ins-alerted" style="border-radius:12px;padding:12px 14px;margin-top:4px">
+        <div class="ins-alerted-ico" style="width:34px;height:34px;font-size:15px;flex-shrink:0"><i class="fa-solid fa-bell-concierge"></i></div>
+        <span style="color:#bfdbfe;font-size:13px">El administrador fue <strong>notificado automáticamente</strong> de este intento de subida duplicada.</span>
+      </div>
+      <button type="button" class="ins-btn ins-btn-outline ins-btn-sm" onclick="insReset()" style="width:auto">
+        <i class="fa-solid fa-arrow-left"></i> Subir otro archivo
       </button>
     </div>
 
@@ -210,20 +214,6 @@
           <i class="fa-solid fa-magnifying-glass"></i> Buscar memorandos
         </a>
       </div>
-    </div>
-
-    <!-- Alerta enviada -->
-    <div id="st-alerted" class="ins-panel ins-panel-col ins-alerted" style="display:none">
-      <div class="ins-alerted-hdr">
-        <div class="ins-alerted-ico"><i class="fa-solid fa-paper-plane"></i></div>
-        <div>
-          <strong>Administrador notificado</strong>
-          <span>El administrador fue notificado. Revisará el caso.</span>
-        </div>
-      </div>
-      <button type="button" class="ins-btn ins-btn-outline ins-btn-sm" onclick="insReset()" style="width:auto">
-        <i class="fa-solid fa-arrow-left"></i> Volver al inicio
-      </button>
     </div>
 
   </div><!-- /result card -->

@@ -1976,6 +1976,7 @@ async def insertar_memorando_verificar_archivo(
     if len(contenido) < 5:
         return JSONResponse({"error": "El archivo está vacío o no es un PDF válido."}, status_code=400)
     hash_sha256 = hashlib.sha256(contenido).hexdigest()
+    nombre_intentado = (archivo.filename or "").strip()[:255]
     with get_db() as conn:
         row = conn.execute(
             """
@@ -1987,6 +1988,22 @@ async def insertar_memorando_verificar_archivo(
             """,
             (hash_sha256,),
         ).fetchone()
+        if row:
+            ya_existe_alerta = conn.execute(
+                "SELECT id FROM alertas_revision WHERE hash_sha256 = ? AND usuario_id = ? AND estado = 'pendiente' LIMIT 1",
+                (hash_sha256, user["id"]),
+            ).fetchone()
+            if not ya_existe_alerta:
+                conn.execute(
+                    "INSERT INTO alertas_revision (hash_sha256, nombre_archivo, nombre_existente, usuario_id, mensaje) VALUES (?, ?, ?, ?, ?)",
+                    (hash_sha256, nombre_intentado, row["nombre_archivo"], user["id"], "Intento de subida detectado automáticamente como duplicado."),
+                )
+                registrar_auditoria(
+                    conn, "ALERTA_DUPLICADO_AUTOMATICA",
+                    usuario_id=user["id"],
+                    detalle={"hash": hash_sha256[:16] + "...", "nombre_intentado": nombre_intentado, "nombre_existente": row["nombre_archivo"]},
+                    ip=client_ip(request), equipo=ua(request), resultado="OK",
+                )
     if row:
         return JSONResponse({
             "existe": True,
@@ -2023,6 +2040,21 @@ async def insertar_memorando_guardar(
             (hash_sha256,),
         ).fetchone()
         if dup:
+            ya_existe_alerta = conn.execute(
+                "SELECT id FROM alertas_revision WHERE hash_sha256 = ? AND usuario_id = ? AND estado = 'pendiente' LIMIT 1",
+                (hash_sha256, user["id"]),
+            ).fetchone()
+            if not ya_existe_alerta:
+                conn.execute(
+                    "INSERT INTO alertas_revision (hash_sha256, nombre_archivo, nombre_existente, usuario_id, mensaje) VALUES (?, ?, ?, ?, ?)",
+                    (hash_sha256, nombre_original[:255], dup["nombre_archivo"], user["id"], "Intento de subida detectado automáticamente como duplicado."),
+                )
+                registrar_auditoria(
+                    conn, "ALERTA_DUPLICADO_AUTOMATICA",
+                    usuario_id=user["id"],
+                    detalle={"hash": hash_sha256[:16] + "...", "nombre_intentado": nombre_original, "nombre_existente": dup["nombre_archivo"]},
+                    ip=client_ip(request), equipo=ua(request), resultado="OK",
+                )
             return JSONResponse(
                 {"error": "duplicado", "detail": "El archivo ya fue subido anteriormente.",
                  "nombre_existente": dup["nombre_archivo"]},
@@ -2108,23 +2140,7 @@ def insertar_memorando_avisar_admin(
     _csrf: None = Depends(verificar_csrf),
 ):
     require_password_ok(request, user)
-    h = hash_sha256.strip().lower()[:64]
-    nombre = nombre_archivo.strip()[:255]
-    with get_db() as conn:
-        conn.execute(
-            """
-            INSERT INTO alertas_revision (hash_sha256, nombre_archivo, usuario_id, mensaje)
-            VALUES (?, ?, ?, ?)
-            """,
-            (h, nombre, user["id"], "El usuario reporta posible duplicado o error al subir."),
-        )
-        registrar_auditoria(
-            conn, "ALERTA_REVISION_ENVIADA",
-            usuario_id=user["id"],
-            detalle={"hash": h[:16] + "...", "nombre": nombre},
-            ip=client_ip(request), equipo=ua(request), resultado="OK",
-        )
-    return JSONResponse({"ok": True, "mensaje": "El administrador fue notificado. Revisará el caso."})
+    return JSONResponse({"ok": True, "mensaje": "El administrador ya fue notificado automáticamente."})
 
 
 # ── ALERTAS DE REVISIÓN (ADMIN) ──────────────────────────────────
@@ -2137,8 +2153,8 @@ def admin_alertas_revision(
 ):
     flash = request.session.pop("sigemep_flash", None)
     sql = """
-        SELECT ar.id, ar.hash_sha256, ar.nombre_archivo, ar.fecha_alerta,
-               ar.estado, ar.mensaje, u.usuario, u.nombre_apellido
+        SELECT ar.id, ar.hash_sha256, ar.nombre_archivo, ar.nombre_existente,
+               ar.fecha_alerta, ar.estado, ar.mensaje, u.usuario, u.nombre_apellido
         FROM alertas_revision ar
         JOIN usuarios u ON u.id = ar.usuario_id
     """

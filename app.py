@@ -117,12 +117,26 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         "form-action 'self'"
     )
 
+    # CSP para el stream de PDF: permite embebido desde el mismo origen
+    # (necesario para el iframe del visor /ver_pdf_completo)
+    _CSP_PDF_STREAM = (
+        "default-src 'self'; "
+        "img-src 'self' data:; "
+        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "font-src 'self' https://cdnjs.cloudflare.com; "
+        "script-src 'self' 'unsafe-inline'; "
+        "frame-ancestors 'self'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    )
+
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
-        response.headers["X-Frame-Options"] = "DENY"
+        es_pdf_stream = request.url.path.startswith("/pdf_completo_stream/")
+        response.headers["X-Frame-Options"] = "SAMEORIGIN" if es_pdf_stream else "DENY"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "same-origin"
-        response.headers["Content-Security-Policy"] = self._CSP
+        response.headers["Content-Security-Policy"] = self._CSP_PDF_STREAM if es_pdf_stream else self._CSP
         return response
 
 

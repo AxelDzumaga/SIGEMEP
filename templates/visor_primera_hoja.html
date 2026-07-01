@@ -36,9 +36,19 @@
       <h1>{{ mem.nombre_archivo or 'Memorando' }}</h1>
       <p>SIGEMEP · Uso interno · Documento protegido con marca de agua</p>
     </div>
-    <button class="vph-back" onclick="history.back()">
-      <i class="fa-solid fa-arrow-left"></i> Volver
-    </button>
+    <div style="display:flex;gap:9px;flex-wrap:wrap;flex-shrink:0">
+      {% if user.rol in ('ADMIN', 'JEFE') %}
+      <a href="/ver_pdf_completo/{{ mem.id }}" class="vph-back" style="background:rgba(255,115,0,.14);border-color:rgba(255,115,0,.35);color:#ffb36b">
+        <i class="fa-solid fa-file-pdf"></i> Ver PDF completo
+      </a>
+      <a href="/descargar/{{ mem.id }}" class="vph-back" target="_blank">
+        <i class="fa-solid fa-download"></i> Descargar
+      </a>
+      {% endif %}
+      <button class="vph-back" onclick="history.back()">
+        <i class="fa-solid fa-arrow-left"></i> Volver
+      </button>
+    </div>
   </div>
 
   <!-- ── AVISO MARCA DE AGUA ── -->

@@ -92,6 +92,14 @@
 /* ── Nota pie ── */
 .ins-note{padding:16px 18px;background:linear-gradient(145deg,rgba(55,27,4,.72),rgba(15,18,20,.96));border:1px solid rgba(255,115,0,.28);border-left:5px solid var(--orange,#ff7300);border-radius:20px;color:#ffcfaa;display:flex;align-items:flex-start;gap:13px;font-size:13px;line-height:1.5}
 .ins-note i{color:var(--orange,#ff7300);font-size:18px;flex-shrink:0;margin-top:1px}
+
+/* ── Selector tipo ── */
+.ins-tipo{display:flex;gap:8px;margin-bottom:18px;padding:12px 14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;align-items:center;flex-wrap:wrap}
+.ins-tipo-lbl{color:#9ca3af;font-size:12px;font-weight:900;margin-right:2px;white-space:nowrap}
+.ins-tipo-opt{display:flex;align-items:center;gap:7px;padding:8px 14px;border-radius:10px;cursor:pointer;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04);color:#9ca3af;font-size:13px;font-weight:900;transition:all .2s;user-select:none}
+.ins-tipo-opt input{display:none}
+.ins-tipo-opt.active{background:rgba(255,115,0,.14);border-color:rgba(255,115,0,.35);color:#ffb36b}
+.ins-tipo-res.active{background:rgba(99,102,241,.13);border-color:rgba(99,102,241,.32);color:#a5b4fc}
 </style>
 {% endblock %}
 
@@ -101,6 +109,21 @@
   <!-- ── CARD CARGA ── -->
   <div class="ins-card">
     <h2 class="ins-card-title"><i class="fa-solid fa-file-arrow-up"></i> Cargar archivo PDF</h2>
+
+    {% if tiene_permiso_reservados %}
+    <!-- Selector de tipo de documento -->
+    <div class="ins-tipo" id="ins-tipo-row">
+      <span class="ins-tipo-lbl"><i class="fa-solid fa-tag"></i> Tipo:</span>
+      <label class="ins-tipo-opt active" id="ins-tipo-mem-lbl">
+        <input type="radio" name="ins_tipo" value="memorando" id="ins-tipo-mem" checked>
+        <i class="fa-solid fa-file-lines"></i> Memorando / Parte
+      </label>
+      <label class="ins-tipo-opt ins-tipo-res" id="ins-tipo-res-lbl">
+        <input type="radio" name="ins_tipo" value="reservado" id="ins-tipo-res">
+        <i class="fa-solid fa-lock"></i> Reservado
+      </label>
+    </div>
+    {% endif %}
 
     <!-- Zona drag & drop -->
     <div id="ins-dz" class="ins-dz">
@@ -202,7 +225,7 @@
       <div class="ins-success-hdr">
         <div class="ins-success-ico"><i class="fa-solid fa-circle-check"></i></div>
         <div>
-          <strong>Memorando guardado correctamente</strong>
+          <strong id="ins-success-title">Memorando guardado correctamente</strong>
           <span id="ins-success-nom">—</span>
         </div>
       </div>
@@ -234,6 +257,26 @@
 
 let _archivo = null;
 let _hash    = null;
+let _tipo    = 'memorando';
+
+// ── Selector tipo ────────────────────────────────────────────────
+function _actualizarTipo(val) {
+  _tipo = val;
+  const memLbl = document.getElementById('ins-tipo-mem-lbl');
+  const resLbl = document.getElementById('ins-tipo-res-lbl');
+  if(memLbl) memLbl.classList.toggle('active', val === 'memorando');
+  if(resLbl) resLbl.classList.toggle('active', val === 'reservado');
+  const btn = document.getElementById('ins-btn-save');
+  if(btn && !btn.disabled) {
+    btn.innerHTML = val === 'reservado'
+      ? '<i class="fa-solid fa-lock"></i> Guardar reservado'
+      : '<i class="fa-solid fa-floppy-disk"></i> Guardar memorando';
+  }
+}
+const _tipoMem = document.getElementById('ins-tipo-mem');
+const _tipoRes = document.getElementById('ins-tipo-res');
+if(_tipoMem) _tipoMem.addEventListener('change', () => _actualizarTipo('memorando'));
+if(_tipoRes) _tipoRes.addEventListener('change', () => _actualizarTipo('reservado'));
 
 // ── Drag & Drop ──────────────────────────────────────────────────
 const dz = document.getElementById('ins-dz');
@@ -272,7 +315,7 @@ function _fmtBytes(b) {
 }
 
 function _setEstado(st) {
-  ['computing','verifying','clean','dup','success','alerted'].forEach(s => {
+  ['computing','verifying','clean','dup','success'].forEach(s => {
     const el = document.getElementById('st-' + s);
     if(el) el.style.display = 'none';
   });
@@ -323,6 +366,7 @@ async function _procesar(f) {
   try {
     const fd = new FormData();
     fd.append('archivo', f);
+    fd.append('tipo', _tipo);
     const resp = await fetch('/brigada/insertar_memorando/verificar_archivo', {
       method: 'POST',
       body: fd,
@@ -368,6 +412,7 @@ window.insGuardar = async function() {
       const xhr = new XMLHttpRequest();
       const fd  = new FormData();
       fd.append('archivo', _archivo);
+      fd.append('tipo', _tipo);
 
       xhr.upload.addEventListener('progress', e => {
         if(e.lengthComputable) _setProgress(Math.round(e.loaded / e.total * 88), 'Subiendo...');
@@ -382,6 +427,8 @@ window.insGuardar = async function() {
             _setProgress(100, 'Listo');
             const pag = d.paginas ? ` · ${d.paginas} página${d.paginas !== 1 ? 's' : ''}` : '';
             document.getElementById('ins-success-nom').textContent = (d.nombre || _archivo.name) + pag;
+            const tit = document.getElementById('ins-success-title');
+            if(tit) tit.textContent = _tipo === 'reservado' ? 'Reservado guardado correctamente' : 'Memorando guardado correctamente';
             resolve(d);
           } else { reject(new Error(d.detail || 'Error desconocido')); }
         } else if(xhr.status === 409) {
@@ -447,12 +494,12 @@ window.insReset = function() {
   dz.style.display       = 'flex';
   document.getElementById('ins-finfo').style.display = 'none';
   document.getElementById('ins-input').value = '';
-  // Reset progress
   _setProgress(0, 'Subiendo...');
   const pw = document.getElementById('ins-prog-wrap');
   if(pw) pw.style.display = 'none';
   const btn = document.getElementById('ins-btn-save');
-  if(btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar memorando'; }
+  const lbl = _tipo === 'reservado' ? '<i class="fa-solid fa-lock"></i> Guardar reservado' : '<i class="fa-solid fa-floppy-disk"></i> Guardar memorando';
+  if(btn) { btn.disabled = false; btn.innerHTML = lbl; }
 };
 
 })();

@@ -1913,7 +1913,10 @@ def error_page(request: Request):
 @app.get("/brigada/insertar_memorando", response_class=HTMLResponse)
 def insertar_memorando_get(request: Request, user: dict = Depends(require_roles("BRIGADA"))):
     require_password_ok(request, user)
-    return templates.TemplateResponse("insertar_memorando.html", {"request": request, "user": user})
+    return templates.TemplateResponse("insertar_memorando.html", {
+        "request": request, "user": user,
+        "tiene_permiso_reservados": bool(user.get("permiso_reservados")),
+    })
 
 
 @app.post("/brigada/insertar_memorando/verificar_hash")
@@ -1969,25 +1972,37 @@ async def insertar_memorando_verificar_archivo(
     request: Request,
     user: dict = Depends(require_roles("BRIGADA")),
     archivo: UploadFile = File(...),
+    tipo: str = Form("memorando"),
     _csrf: None = Depends(verificar_csrf),
 ):
     require_password_ok(request, user)
+    tipo = tipo if tipo in ("memorando", "reservado") else "memorando"
+    if tipo == "reservado" and not user.get("permiso_reservados"):
+        return JSONResponse({"error": "Sin permiso para subir reservados."}, status_code=403)
     contenido = await _leer_archivo_con_limite(archivo, MAX_UPLOAD_BYTES)
     if len(contenido) < 5:
         return JSONResponse({"error": "El archivo está vacío o no es un PDF válido."}, status_code=400)
     hash_sha256 = hashlib.sha256(contenido).hexdigest()
     nombre_intentado = (archivo.filename or "").strip()[:255]
     with get_db() as conn:
-        row = conn.execute(
-            """
-            SELECT m.nombre_archivo, m.fecha_indexado, u.usuario
-            FROM memorandos m
-            LEFT JOIN usuarios u ON u.id = m.usuario_id
-            WHERE m.hash_sha256 = ? AND m.activo = 1
-            LIMIT 1
-            """,
-            (hash_sha256,),
-        ).fetchone()
+        if tipo == "reservado":
+            row = conn.execute(
+                "SELECT nombre_archivo, fecha_indexado FROM reservados WHERE hash_sha256 = ? AND activo = 1 LIMIT 1",
+                (hash_sha256,),
+            ).fetchone()
+            usuario_dup = None
+        else:
+            row = conn.execute(
+                """
+                SELECT m.nombre_archivo, m.fecha_indexado, u.usuario
+                FROM memorandos m
+                LEFT JOIN usuarios u ON u.id = m.usuario_id
+                WHERE m.hash_sha256 = ? AND m.activo = 1
+                LIMIT 1
+                """,
+                (hash_sha256,),
+            ).fetchone()
+            usuario_dup = row["usuario"] if row else None
         if row:
             ya_existe_alerta = conn.execute(
                 "SELECT id FROM alertas_revision WHERE hash_sha256 = ? AND usuario_id = ? AND estado = 'pendiente' LIMIT 1",
@@ -1996,12 +2011,12 @@ async def insertar_memorando_verificar_archivo(
             if not ya_existe_alerta:
                 conn.execute(
                     "INSERT INTO alertas_revision (hash_sha256, nombre_archivo, nombre_existente, usuario_id, mensaje) VALUES (?, ?, ?, ?, ?)",
-                    (hash_sha256, nombre_intentado, row["nombre_archivo"], user["id"], "Intento de subida detectado automáticamente como duplicado."),
+                    (hash_sha256, nombre_intentado, row["nombre_archivo"], user["id"], f"Intento de subida detectado automáticamente como duplicado ({tipo})."),
                 )
                 registrar_auditoria(
                     conn, "ALERTA_DUPLICADO_AUTOMATICA",
                     usuario_id=user["id"],
-                    detalle={"hash": hash_sha256[:16] + "...", "nombre_intentado": nombre_intentado, "nombre_existente": row["nombre_archivo"]},
+                    detalle={"hash": hash_sha256[:16] + "...", "tipo": tipo, "nombre_intentado": nombre_intentado, "nombre_existente": row["nombre_archivo"]},
                     ip=client_ip(request), equipo=ua(request), resultado="OK",
                 )
     if row:
@@ -2010,7 +2025,7 @@ async def insertar_memorando_verificar_archivo(
             "hash": hash_sha256,
             "nombre_archivo": row["nombre_archivo"],
             "fecha_subida": row["fecha_indexado"],
-            "usuario": row["usuario"] or "—",
+            "usuario": usuario_dup or "—",
         })
     return JSONResponse({"existe": False, "hash": hash_sha256})
 
@@ -2020,9 +2035,13 @@ async def insertar_memorando_guardar(
     request: Request,
     user: dict = Depends(require_roles("BRIGADA")),
     archivo: UploadFile = File(...),
+    tipo: str = Form("memorando"),
     _csrf: None = Depends(verificar_csrf),
 ):
     require_password_ok(request, user)
+    tipo = tipo if tipo in ("memorando", "reservado") else "memorando"
+    if tipo == "reservado" and not user.get("permiso_reservados"):
+        raise HTTPException(403, detail="Sin permiso para subir reservados.")
 
     nombre_original = (archivo.filename or "memorando.pdf").strip()
     if not nombre_original.lower().endswith(".pdf"):
@@ -2033,10 +2052,11 @@ async def insertar_memorando_guardar(
         raise HTTPException(400, detail="El archivo está vacío o no es un PDF válido.")
 
     hash_sha256 = hashlib.sha256(contenido).hexdigest()
+    tabla_dup = "reservados" if tipo == "reservado" else "memorandos"
 
     with get_db() as conn:
         dup = conn.execute(
-            "SELECT nombre_archivo FROM memorandos WHERE hash_sha256 = ? AND activo = 1 LIMIT 1",
+            f"SELECT nombre_archivo FROM {tabla_dup} WHERE hash_sha256 = ? AND activo = 1 LIMIT 1",
             (hash_sha256,),
         ).fetchone()
         if dup:
@@ -2047,12 +2067,12 @@ async def insertar_memorando_guardar(
             if not ya_existe_alerta:
                 conn.execute(
                     "INSERT INTO alertas_revision (hash_sha256, nombre_archivo, nombre_existente, usuario_id, mensaje) VALUES (?, ?, ?, ?, ?)",
-                    (hash_sha256, nombre_original[:255], dup["nombre_archivo"], user["id"], "Intento de subida detectado automáticamente como duplicado."),
+                    (hash_sha256, nombre_original[:255], dup["nombre_archivo"], user["id"], f"Intento de subida detectado automáticamente como duplicado ({tipo})."),
                 )
                 registrar_auditoria(
                     conn, "ALERTA_DUPLICADO_AUTOMATICA",
                     usuario_id=user["id"],
-                    detalle={"hash": hash_sha256[:16] + "...", "nombre_intentado": nombre_original, "nombre_existente": dup["nombre_archivo"]},
+                    detalle={"hash": hash_sha256[:16] + "...", "tipo": tipo, "nombre_intentado": nombre_original, "nombre_existente": dup["nombre_archivo"]},
                     ip=client_ip(request), equipo=ua(request), resultado="OK",
                 )
             return JSONResponse(
@@ -2060,7 +2080,7 @@ async def insertar_memorando_guardar(
                  "nombre_existente": dup["nombre_archivo"]},
                 status_code=409,
             )
-        carpeta = carpeta_pdf_actual(conn)
+        carpeta = carpeta_reservados_actual(conn) if tipo == "reservado" else carpeta_pdf_actual(conn)
 
     carpeta_path = Path(str(carpeta))
     if not carpeta_path.is_dir():
@@ -2101,32 +2121,58 @@ async def insertar_memorando_guardar(
         rel = destino.name
 
     with get_db() as conn:
-        conn.execute(
-            """
-            INSERT INTO memorandos (
-                nombre_archivo, ruta_archivo, texto_extraido, cantidad_paginas,
-                primera_hoja_img, activo, tamanio_bytes, mtime, fecha_hecho,
-                hash_sha256, usuario_id
-            ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
-            """,
-            (
-                destino.name, rel, texto, n_pages,
-                str(preview_path) if preview_path else None,
-                len(contenido), int(destino.stat().st_mtime),
-                extraer_fecha_hecho(destino.name),
-                hash_sha256, user["id"],
-            ),
-        )
-        try:
-            rebuild_fts(conn)
-        except Exception:
-            pass
-        registrar_auditoria(
-            conn, "MEMORANDO_SUBIDO",
-            usuario_id=user["id"],
-            detalle={"nombre": destino.name, "paginas": n_pages, "bytes": len(contenido)},
-            ip=client_ip(request), equipo=ua(request), resultado="OK",
-        )
+        if tipo == "reservado":
+            conn.execute(
+                """
+                INSERT INTO reservados (
+                    nombre_archivo, ruta_archivo, texto_extraido, cantidad_paginas,
+                    primera_hoja_img, activo, tamanio_bytes, mtime, hash_sha256, usuario_id
+                ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+                """,
+                (
+                    destino.name, rel, texto, n_pages,
+                    str(preview_path) if preview_path else None,
+                    len(contenido), int(destino.stat().st_mtime),
+                    hash_sha256, user["id"],
+                ),
+            )
+            try:
+                rebuild_fts(conn, "reservados_fts")
+            except Exception:
+                pass
+            registrar_auditoria(
+                conn, "RESERVADO_SUBIDO",
+                usuario_id=user["id"],
+                detalle={"nombre": destino.name, "paginas": n_pages, "bytes": len(contenido)},
+                ip=client_ip(request), equipo=ua(request), resultado="OK",
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO memorandos (
+                    nombre_archivo, ruta_archivo, texto_extraido, cantidad_paginas,
+                    primera_hoja_img, activo, tamanio_bytes, mtime, fecha_hecho,
+                    hash_sha256, usuario_id
+                ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
+                """,
+                (
+                    destino.name, rel, texto, n_pages,
+                    str(preview_path) if preview_path else None,
+                    len(contenido), int(destino.stat().st_mtime),
+                    extraer_fecha_hecho(destino.name),
+                    hash_sha256, user["id"],
+                ),
+            )
+            try:
+                rebuild_fts(conn)
+            except Exception:
+                pass
+            registrar_auditoria(
+                conn, "MEMORANDO_SUBIDO",
+                usuario_id=user["id"],
+                detalle={"nombre": destino.name, "paginas": n_pages, "bytes": len(contenido)},
+                ip=client_ip(request), equipo=ua(request), resultado="OK",
+            )
 
     return JSONResponse({"ok": True, "nombre": destino.name, "paginas": n_pages})
 

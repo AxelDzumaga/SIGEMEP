@@ -56,7 +56,6 @@ from services.pdf_service import (
 )
 from services.search_service import buscar_memorandos
 from services.memo_creator import generar_pdf_memorando, nombre_archivo_memorando
-from services import totp_service
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("sigemep")

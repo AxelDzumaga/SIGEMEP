@@ -4,6 +4,7 @@ import csv
 import hashlib
 import hmac
 import io
+import json
 import logging
 import secrets
 import threading
@@ -55,6 +56,7 @@ from services.pdf_service import (
 )
 from services.search_service import buscar_memorandos
 from services.memo_creator import generar_pdf_memorando, nombre_archivo_memorando
+from services import totp_service
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("sigemep")
@@ -848,118 +850,6 @@ def ver_primera_hoja(mem_id: int, request: Request, user: dict = Depends(require
         registrar_auditoria(conn, "PRIMERA_HOJA_VISUALIZADA", usuario_id=user["id"], memorando_id=mem_id, detalle={"archivo": m["nombre_archivo"]}, ip=client_ip(request), equipo=ua(request), resultado="OK")
     return templates.TemplateResponse("visor_primera_hoja.html", {"request": request, "user": user, "mem": dict(m), "imagen_b64": base64.b64encode(img_bytes).decode("ascii")})
 
-
-def ruta_absoluta_segura(ruta_guardada, conn=None):
-    from pathlib import Path
-
-    base_dir = Path(__file__).resolve().parent
-    raw = str(ruta_guardada or "").strip().strip(chr(34)).strip(chr(39))
-
-    if not raw:
-        return None
-
-    posibles_dirs = []
-
-    def add_dir(value):
-        if value is None:
-            return
-
-        s = str(value).strip().strip(chr(34)).strip(chr(39))
-        if not s:
-            return
-
-        p = Path(s)
-        if not p.is_absolute():
-            p = base_dir / p
-
-        try:
-            p = p.resolve()
-        except Exception:
-            pass
-
-        if p.exists() and p.is_dir() and p not in posibles_dirs:
-            posibles_dirs.append(p)
-
-    # 1) Carpetas guardadas en tabla configuracion.
-    if conn is not None:
-        try:
-            rows = conn.execute("SELECT * FROM configuracion").fetchall()
-
-            for row in rows:
-                try:
-                    data = dict(row)
-                except Exception:
-                    continue
-
-                # Buscar columnas tipo carpeta/ruta/pdf/path/directorio.
-                for k, v in data.items():
-                    lk = str(k).lower()
-                    if ("carpeta" in lk) or ("ruta" in lk) or ("pdf" in lk) or ("directorio" in lk) or ("path" in lk):
-                        add_dir(v)
-
-                # Si la tabla es clave/valor, tomar el valor cuando la clave habla de PDF.
-                vals = list(data.values())
-                if len(vals) >= 2:
-                    key_text = str(vals[0]).lower()
-                    if ("carpeta" in key_text) or ("ruta" in key_text) or ("pdf" in key_text) or ("directorio" in key_text) or ("path" in key_text):
-                        add_dir(vals[1])
-        except Exception:
-            pass
-
-    # 2) Carpetas comunes dentro de C:\SIGEMEP_APP.
-    for d in (
-        base_dir,
-        base_dir / "pdfs",
-        base_dir / "PDFS",
-        base_dir / "memorandos",
-        base_dir / "Memorandos",
-        base_dir / "uploads",
-        base_dir / "archivos",
-        base_dir / "archivos_pdf",
-        base_dir / "data",
-        base_dir / "static" / "pdfs",
-    ):
-        add_dir(d)
-
-    original = Path(raw)
-
-    # 3) Ruta absoluta.
-    if original.is_absolute():
-        try:
-            original_resuelta = original.resolve()
-        except Exception:
-            original_resuelta = original
-
-        if original_resuelta.exists() and original_resuelta.is_file():
-            return str(original_resuelta)
-
-    # 4) Ruta relativa.
-    relativo_base = base_dir / raw
-    if relativo_base.exists() and relativo_base.is_file():
-        return str(relativo_base.resolve())
-
-    # 5) Solo nombre de archivo.
-    nombre = Path(raw).name
-
-    for carpeta in posibles_dirs:
-        candidato = carpeta / raw
-        if candidato.exists() and candidato.is_file():
-            return str(candidato.resolve())
-
-        candidato = carpeta / nombre
-        if candidato.exists() and candidato.is_file():
-            return str(candidato.resolve())
-
-    # 6) Búsqueda recursiva por nombre exacto dentro de carpetas candidatas.
-    for carpeta in posibles_dirs:
-        try:
-            for candidato in carpeta.rglob(nombre):
-                if candidato.exists() and candidato.is_file():
-                    return str(candidato.resolve())
-        except Exception:
-            continue
-
-    return None
 
 @app.get("/descargar/{mem_id}")
 def descargar(mem_id: int, request: Request, user: dict = Depends(require_login)):
@@ -1894,10 +1784,15 @@ async def nuevo_memorando_guardar(
     if not carpeta or not Path(carpeta).is_dir():
         raise HTTPException(status_code=500,
             detail="La carpeta de destino no está disponible. Contactá al administrador.")
-    destino = Path(carpeta) / nombre
+    carpeta_path = Path(carpeta)
+    destino = carpeta_path / nombre
     if destino.exists():
         raise HTTPException(status_code=409,
             detail=f"Ya existe un memorando con ese número y fecha. Verificá el correlativo.")
+    try:
+        destino.resolve().relative_to(carpeta_path.resolve())
+    except ValueError:
+        raise HTTPException(400, detail="Número de memorando inválido.")
     pdf_bytes = generar_pdf_memorando(campos)
     destino.write_bytes(pdf_bytes)
     with get_db() as conn:
@@ -1963,6 +1858,18 @@ def insertar_memorando_verificar_hash(
             "usuario": row["usuario"] or "—",
         })
     return JSONResponse({"existe": False})
+
+
+def _sanitizar_nombre_subida(nombre: str, default: str = "memorando.pdf") -> str:
+    """Descarta cualquier componente de directorio del nombre subido por el
+    cliente (p. ej. '../../etc/x.pdf' o 'a\\..\\..\\x.pdf'), quedándose solo
+    con el nombre de archivo final, para evitar escribir fuera de la carpeta
+    de destino."""
+    nombre = (nombre or "").strip().replace("\\", "/")
+    nombre = nombre.split("/")[-1].strip()
+    if not nombre or nombre in (".", ".."):
+        return default
+    return nombre
 
 
 async def _leer_archivo_con_limite(archivo: UploadFile, limite_bytes: int) -> bytes:
@@ -2057,7 +1964,7 @@ async def insertar_memorando_guardar(
     if tipo == "reservado" and not user.get("permiso_reservados"):
         raise HTTPException(403, detail="Sin permiso para subir reservados.")
 
-    nombre_original = (archivo.filename or "memorando.pdf").strip()
+    nombre_original = _sanitizar_nombre_subida(archivo.filename or "memorando.pdf")
     if not nombre_original.lower().endswith(".pdf"):
         raise HTTPException(400, detail="Solo se aceptan archivos PDF.")
 
@@ -2107,6 +2014,11 @@ async def insertar_memorando_guardar(
         while destino.exists():
             destino = carpeta_path / f"{stem}_{i}{suf}"
             i += 1
+
+    try:
+        destino.resolve().relative_to(carpeta_path.resolve())
+    except ValueError:
+        raise HTTPException(400, detail="Nombre de archivo inválido.")
 
     destino.write_bytes(contenido)
 
@@ -2228,12 +2140,35 @@ def admin_alertas_revision(
         n_pendientes = conn.execute(
             "SELECT COUNT(*) FROM alertas_revision WHERE estado = 'pendiente'"
         ).fetchone()[0]
+        ultimo_subido_row = conn.execute("""
+            SELECT a.fecha_hora, a.detalle, u.usuario, u.nombre_apellido
+            FROM auditoria a
+            JOIN usuarios u ON u.id = a.usuario_id
+            WHERE a.accion = 'MEMORANDO_SUBIDO'
+            ORDER BY a.fecha_hora DESC
+            LIMIT 1
+        """).fetchone()
+
+    ultimo_subido = None
+    if ultimo_subido_row:
+        try:
+            detalle = json.loads(ultimo_subido_row["detalle"] or "{}")
+        except (ValueError, TypeError):
+            detalle = {}
+        ultimo_subido = {
+            "nombre_archivo": detalle.get("nombre", "—"),
+            "usuario": ultimo_subido_row["usuario"],
+            "nombre_apellido": ultimo_subido_row["nombre_apellido"],
+            "fecha_hora": ultimo_subido_row["fecha_hora"],
+        }
+
     return templates.TemplateResponse("alertas_revision.html", {
         "request": request, "user": user,
         "alertas": [dict(r) for r in rows],
         "n_pendientes": n_pendientes,
         "filtro_estado": estado or "",
         "flash": flash,
+        "ultimo_subido": ultimo_subido,
     })
 
 

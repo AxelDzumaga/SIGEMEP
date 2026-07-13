@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Alertas de Revisión · SIGEMEP{% endblock %}
+{% block title %}Alertas de Revisión · Memo Search{% endblock %}
 {% block page_title %}Alertas de revisión{% endblock %}
 
 {% block head %}
@@ -43,6 +43,12 @@
 .al-empty{padding:48px 28px;text-align:center;color:#9ca3af}
 .al-empty i{font-size:38px;color:rgba(255,115,0,.45);margin-bottom:14px}
 .al-empty strong{display:block;color:#fff;font-size:16px;font-weight:950;margin-bottom:6px}
+
+.al-ultimo{background:linear-gradient(145deg,rgba(18,24,28,.96),rgba(7,10,12,.99));border:1px solid rgba(255,255,255,.10);border-left:5px solid var(--orange);border-radius:22px;padding:16px 18px;box-shadow:var(--shadow);display:flex;align-items:center;gap:14px}
+.al-ultimo-icon{width:44px;height:44px;border-radius:14px;background:rgba(255,115,0,.14);color:var(--orange);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.al-ultimo-label{color:#9ca3af;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.al-ultimo-nombre{color:#fff;font-size:14px;font-weight:950;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.al-ultimo-meta{color:#9ca3af;font-size:12px;margin-top:2px}
 </style>
 {% endblock %}
 
@@ -66,6 +72,23 @@
   {% if flash %}
   <div class="al-alert"><i class="fa-solid fa-circle-info"></i> {{ flash }}</div>
   {% endif %}
+
+  <!-- ── ÚLTIMO MEMORANDO SUBIDO MANUALMENTE ── -->
+  <div class="al-ultimo">
+    <div class="al-ultimo-icon"><i class="fa-solid fa-file-arrow-up"></i></div>
+    {% if ultimo_subido %}
+    <div>
+      <div class="al-ultimo-label">Último memorando subido manualmente</div>
+      <div class="al-ultimo-nombre" title="{{ ultimo_subido.nombre_archivo }}">{{ ultimo_subido.nombre_archivo }}</div>
+      <div class="al-ultimo-meta">{{ ultimo_subido.usuario }}{% if ultimo_subido.nombre_apellido %} · {{ ultimo_subido.nombre_apellido }}{% endif %} · {{ ultimo_subido.fecha_hora }}</div>
+    </div>
+    {% else %}
+    <div>
+      <div class="al-ultimo-label">Último memorando subido manualmente</div>
+      <div class="al-ultimo-meta">Todavía no se subió ningún memorando por esta vía.</div>
+    </div>
+    {% endif %}
+  </div>
 
   <!-- ── FILTROS ── -->
   <div class="al-filter">

@@ -23,7 +23,7 @@ def _limpiar(texto: str) -> str:
 
 def nombre_archivo_memorando(campos: dict) -> str:
     """Genera el nombre del archivo: {NRO}-"{HECHO}"-{YYYY-MM-DD}.pdf"""
-    nro = str(campos.get("nro", "")).strip() or "SIN-NRO"
+    nro = _limpiar(str(campos.get("nro", "")).strip()) or "SIN-NRO"
     hecho = _limpiar((campos.get("hecho", "") or "SIN RESENA").upper())
     fecha_str = campos.get("fecha_hecho", "") or ""
     try:

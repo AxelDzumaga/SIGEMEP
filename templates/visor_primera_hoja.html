@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Primera hoja · {{ mem.nombre_archivo }} · SIGEMEP{% endblock %}
+{% block title %}Primera hoja · {{ mem.nombre_archivo }} · Memo Search{% endblock %}
 {% block page_title %}Visor protegido{% endblock %}
 
 {% block head %}
@@ -34,7 +34,7 @@
     <div class="vph-header-left">
       <span class="section-tag"><i class="fa-solid fa-eye"></i> Vista protegida</span>
       <h1>{{ mem.nombre_archivo or 'Memorando' }}</h1>
-      <p>SIGEMEP · Uso interno · Documento protegido con marca de agua</p>
+      <p>Memo Search · Uso interno · Documento protegido con marca de agua</p>
     </div>
     <div style="display:flex;gap:9px;flex-wrap:wrap;flex-shrink:0">
       {% if user.rol in ('ADMIN', 'JEFE') %}

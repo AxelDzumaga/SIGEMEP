@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="csrf-token" content="{{ request.session.get('csrf_token', '') }}">
-<title>{% block title %}SIGEMEP{% endblock %}</title>
+<title>{% block title %}Memo Search{% endblock %}</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <link rel="stylesheet" href="{{ url_for('static', path='css/styles.css') }}">
 <script>window.SIGEMEP_CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;</script>
@@ -15,7 +15,7 @@
 <div class="app-shell">
 <aside class="sidebar">
 <div>
-<div class="brand"><div class="brand-logo"><i class="fa-solid fa-shield-halved"></i></div><div><h1>SIGEMEP</h1><p>Uso interno</p></div></div>
+<div class="brand"><div class="brand-logo"><i class="fa-solid fa-shield-halved"></i></div><div><h1>Memo Search</h1><p>Uso interno</p></div></div>
 <nav class="nav-menu">
 {% set p = request.url.path %}
 {% if user.rol == 'ADMIN' %}
@@ -45,7 +45,7 @@
 <a href="/logout" class="nav-item logout"><i class="fa-solid fa-right-from-bracket"></i><span>Cerrar sesión</span></a>
 </aside>
 <main class="main">
-<header class="topbar"><div><h2>{% block page_title %}SIGEMEP{% endblock %}</h2><p>Sistema de Consulta y Auditoría de Memorandos</p></div><div class="user-box"><div><strong>{{ user.usuario }}</strong><span>{{ user.rol }}</span></div><div class="user-avatar">{{ user.usuario[0]|upper if user.usuario else "U" }}</div></div></header>
+<header class="topbar"><div><h2>{% block page_title %}Memo Search{% endblock %}</h2><p>Sistema de Consulta y Auditoría de Memorandos</p></div><div class="user-box"><div><strong>{{ user.usuario }}</strong><span>{{ user.rol }}</span></div><div class="user-avatar">{{ user.usuario[0]|upper if user.usuario else "U" }}</div></div></header>
 {% if flash %}<div class="alert"><i class="fa-solid fa-circle-info"></i><span>{{ flash }}</span></div>{% endif %}
 <section class="page-content">
 {% else %}

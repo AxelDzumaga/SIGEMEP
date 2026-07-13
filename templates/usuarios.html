@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Usuarios · SIGEMEP{% endblock %}
+{% block title %}Usuarios · Memo Search{% endblock %}
 {% block page_title %}Gestión de usuarios{% endblock %}
 
 {% block head %}
 <style>
 .topbar{display:none!important}.main{padding-top:18px!important}.users-page{display:grid;gap:20px}
 .users-hero{position:relative;overflow:hidden;background:radial-gradient(circle at top right,rgba(255,115,0,.16),transparent 35%),linear-gradient(145deg,rgba(18,24,28,.98),rgba(7,10,12,.99));border:1px solid rgba(255,255,255,.10);border-left:5px solid var(--orange);border-radius:30px;padding:28px;box-shadow:var(--shadow);display:flex;justify-content:space-between;gap:20px;align-items:flex-start}
-.users-hero::after{content:"SIGEMEP";position:absolute;right:150px;top:45%;transform:translateY(-50%);color:rgba(255,255,255,.035);font-size:58px;font-weight:950;letter-spacing:7px;pointer-events:none}
+.users-hero::after{content:"MEMO SEARCH";position:absolute;right:150px;top:45%;transform:translateY(-50%);color:rgba(255,255,255,.035);font-size:58px;font-weight:950;letter-spacing:7px;pointer-events:none}
 .users-hero h1{margin:16px 0 0;color:#fff;font-size:42px;font-weight:950;letter-spacing:-1px}.users-hero p{margin:10px 0 0;color:var(--muted);font-size:14px}
 .users-header-userbox{position:relative;z-index:2;min-width:135px;background:linear-gradient(145deg,rgba(12,16,18,.96),rgba(3,5,6,.98));border:1px solid rgba(255,115,0,.38);border-radius:20px;padding:11px 12px 11px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 0 24px rgba(255,115,0,.20),inset 0 0 18px rgba(255,115,0,.04)}
 .users-header-userbox strong{display:block;color:#fff;font-size:14px;font-weight:950}.users-header-userbox span{display:block;color:#ffb36b;font-size:11px;font-weight:950;margin-top:4px}.users-header-avatar{width:42px;height:42px;border-radius:14px;background:linear-gradient(145deg,#ff8a00,#ff7300);color:#111;display:flex;align-items:center;justify-content:center;font-weight:950}

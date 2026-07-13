@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}PDF completo - SIGEMEP{% endblock %}
+{% block title %}PDF completo - Memo Search{% endblock %}
 {% block page_title %}Visualización documental{% endblock %}
 
 {% block head %}
 <style>
 .pdf-full-page { position: relative; display: grid; gap: 14px; min-height: calc(100vh - 40px); overflow: hidden; }
 .pdf-full-page::before {
-    content: "SIGEMEP\A USO INTERNO"; white-space: pre-line; position: fixed; right: 18px; bottom: 22px; z-index: 0;
+    content: "MEMO SEARCH\A USO INTERNO"; white-space: pre-line; position: fixed; right: 18px; bottom: 22px; z-index: 0;
     color: rgba(255,255,255,.035); font-size: clamp(44px, 7vw, 108px); line-height: .86; font-weight: 950;
     letter-spacing: 6px; text-align: right; pointer-events: none;
 }
@@ -87,7 +87,7 @@
 {% block content %}
 <section class="pdf-full-page">
     <div class="pdf-topbar">
-        <strong><i class="fa-solid fa-shield-halved"></i> DIVISIÓN SEGUIMIENTO DE LAS CONDUCTAS POLICIALES · SIGEMEP</strong>
+        <strong><i class="fa-solid fa-shield-halved"></i> DIVISIÓN SEGUIMIENTO DE LAS CONDUCTAS POLICIALES · Memo Search</strong>
         <span>Visualización completa registrada · Uso interno</span>
     </div>
 

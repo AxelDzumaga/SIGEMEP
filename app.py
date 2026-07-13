@@ -1904,6 +1904,8 @@ async def insertar_memorando_verificar_archivo(
         return JSONResponse({"error": "El archivo está vacío o no es un PDF válido."}, status_code=400)
     hash_sha256 = hashlib.sha256(contenido).hexdigest()
     nombre_intentado = (archivo.filename or "").strip()[:255]
+    nombre_sanitizado = _sanitizar_nombre_subida(archivo.filename or "memorando.pdf")
+    nombre_duplicado = False
     with get_db() as conn:
         if tipo == "reservado":
             row = conn.execute(
@@ -1930,7 +1932,7 @@ async def insertar_memorando_verificar_archivo(
             ).fetchone()
             if not ya_existe_alerta:
                 conn.execute(
-                    "INSERT INTO alertas_revision (hash_sha256, nombre_archivo, nombre_existente, usuario_id, mensaje) VALUES (?, ?, ?, ?, ?)",
+                    "INSERT INTO alertas_revision (hash_sha256, nombre_archivo, nombre_existente, usuario_id, mensaje, tipo) VALUES (?, ?, ?, ?, ?, 'hash')",
                     (hash_sha256, nombre_intentado, row["nombre_archivo"], user["id"], f"Intento de subida detectado automáticamente como duplicado ({tipo})."),
                 )
                 registrar_auditoria(
@@ -1939,6 +1941,25 @@ async def insertar_memorando_verificar_archivo(
                     detalle={"hash": hash_sha256[:16] + "...", "tipo": tipo, "nombre_intentado": nombre_intentado, "nombre_existente": row["nombre_archivo"]},
                     ip=client_ip(request), equipo=ua(request), resultado="OK",
                 )
+        elif nombre_sanitizado:
+            carpeta = carpeta_reservados_actual(conn) if tipo == "reservado" else carpeta_pdf_actual(conn)
+            if (Path(str(carpeta)) / nombre_sanitizado).is_file():
+                nombre_duplicado = True
+                ya_existe_alerta_nombre = conn.execute(
+                    "SELECT id FROM alertas_revision WHERE nombre_archivo = ? AND usuario_id = ? AND estado = 'pendiente' AND tipo = 'nombre' LIMIT 1",
+                    (nombre_sanitizado, user["id"]),
+                ).fetchone()
+                if not ya_existe_alerta_nombre:
+                    conn.execute(
+                        "INSERT INTO alertas_revision (hash_sha256, nombre_archivo, nombre_existente, usuario_id, mensaje, tipo) VALUES (?, ?, ?, ?, ?, 'nombre')",
+                        (hash_sha256, nombre_intentado, nombre_sanitizado, user["id"], f"Nombre de archivo ya existente pero contenido distinto ({tipo})."),
+                    )
+                    registrar_auditoria(
+                        conn, "ALERTA_NOMBRE_DUPLICADO_AUTOMATICA",
+                        usuario_id=user["id"],
+                        detalle={"tipo": tipo, "nombre_intentado": nombre_intentado, "nombre_existente": nombre_sanitizado},
+                        ip=client_ip(request), equipo=ua(request), resultado="OK",
+                    )
     if row:
         return JSONResponse({
             "existe": True,
@@ -1946,6 +1967,13 @@ async def insertar_memorando_verificar_archivo(
             "nombre_archivo": row["nombre_archivo"],
             "fecha_subida": row["fecha_indexado"],
             "usuario": usuario_dup or "—",
+        })
+    if nombre_duplicado:
+        return JSONResponse({
+            "existe": False,
+            "nombre_duplicado": True,
+            "nombre_existente": nombre_sanitizado,
+            "hash": hash_sha256,
         })
     return JSONResponse({"existe": False, "hash": hash_sha256})
 
@@ -1986,7 +2014,7 @@ async def insertar_memorando_guardar(
             ).fetchone()
             if not ya_existe_alerta:
                 conn.execute(
-                    "INSERT INTO alertas_revision (hash_sha256, nombre_archivo, nombre_existente, usuario_id, mensaje) VALUES (?, ?, ?, ?, ?)",
+                    "INSERT INTO alertas_revision (hash_sha256, nombre_archivo, nombre_existente, usuario_id, mensaje, tipo) VALUES (?, ?, ?, ?, ?, 'hash')",
                     (hash_sha256, nombre_original[:255], dup["nombre_archivo"], user["id"], f"Intento de subida detectado automáticamente como duplicado ({tipo})."),
                 )
                 registrar_auditoria(
@@ -2007,6 +2035,25 @@ async def insertar_memorando_guardar(
         raise HTTPException(500, detail="La carpeta de destino no está disponible. Contactá al administrador.")
 
     destino = carpeta_path / nombre_original
+    nombre_duplicado = destino.is_file()
+    if nombre_duplicado:
+        with get_db() as conn:
+            ya_existe_alerta_nombre = conn.execute(
+                "SELECT id FROM alertas_revision WHERE nombre_archivo = ? AND usuario_id = ? AND estado = 'pendiente' AND tipo = 'nombre' LIMIT 1",
+                (nombre_original, user["id"]),
+            ).fetchone()
+            if not ya_existe_alerta_nombre:
+                conn.execute(
+                    "INSERT INTO alertas_revision (hash_sha256, nombre_archivo, nombre_existente, usuario_id, mensaje, tipo) VALUES (?, ?, ?, ?, ?, 'nombre')",
+                    (hash_sha256, nombre_original, nombre_original, user["id"], f"Se guardó un archivo con nombre ya existente pero contenido distinto ({tipo})."),
+                )
+                registrar_auditoria(
+                    conn, "ALERTA_NOMBRE_DUPLICADO_AUTOMATICA",
+                    usuario_id=user["id"],
+                    detalle={"tipo": tipo, "nombre": nombre_original},
+                    ip=client_ip(request), equipo=ua(request), resultado="OK",
+                )
+
     if destino.exists():
         stem, suf = Path(nombre_original).stem, Path(nombre_original).suffix
         i = 1
@@ -2099,7 +2146,10 @@ async def insertar_memorando_guardar(
                 ip=client_ip(request), equipo=ua(request), resultado="OK",
             )
 
-    return JSONResponse({"ok": True, "nombre": destino.name, "paginas": n_pages})
+    return JSONResponse({
+        "ok": True, "nombre": destino.name, "paginas": n_pages,
+        "nombre_duplicado": nombre_duplicado,
+    })
 
 
 @app.post("/brigada/insertar_memorando/avisar_admin")
@@ -2125,7 +2175,7 @@ def admin_alertas_revision(
     flash = request.session.pop("sigemep_flash", None)
     sql = """
         SELECT ar.id, ar.hash_sha256, ar.nombre_archivo, ar.nombre_existente,
-               ar.fecha_alerta, ar.estado, ar.mensaje, u.usuario, u.nombre_apellido
+               ar.fecha_alerta, ar.estado, ar.mensaje, ar.tipo, u.usuario, u.nombre_apellido
         FROM alertas_revision ar
         JOIN usuarios u ON u.id = ar.usuario_id
     """

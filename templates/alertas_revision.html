@@ -113,6 +113,7 @@
           <th>#</th>
           <th>Fecha</th>
           <th>Usuario</th>
+          <th>Tipo</th>
           <th>Archivo intentado</th>
           <th>Coincide con</th>
           <th>Hash SHA-256</th>
@@ -129,6 +130,13 @@
             <strong style="color:#fff">{{ a.usuario }}</strong>
             {% if a.nombre_apellido %}
             <div style="color:#9ca3af;font-size:11px;margin-top:2px">{{ a.nombre_apellido }}</div>
+            {% endif %}
+          </td>
+          <td>
+            {% if a.tipo == 'nombre' %}
+              <span class="pill-pend"><i class="fa-solid fa-signature"></i> Nombre</span>
+            {% else %}
+              <span class="pill-rev"><i class="fa-solid fa-fingerprint"></i> Contenido</span>
             {% endif %}
           </td>
           <td><div class="al-nombre" title="{{ a.nombre_archivo }}">{{ a.nombre_archivo or '—' }}</div></td>

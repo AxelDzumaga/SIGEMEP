@@ -48,6 +48,10 @@
 .ins-clean-ico{width:42px;height:42px;border-radius:14px;background:rgba(34,197,94,.14);color:#22c55e;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
 .ins-clean-hdr strong{color:#d1fae5;font-size:15px;font-weight:950;display:block}
 .ins-clean-hdr span{color:#86efac;font-size:12px;display:block;margin-top:2px}
+.ins-namewarn-active.ins-clean{background:rgba(251,146,60,.07);border-color:rgba(251,146,60,.26)}
+.ins-namewarn-active .ins-clean-ico{background:rgba(251,146,60,.14);color:#fb923c}
+.ins-namewarn-active .ins-clean-hdr strong{color:#fed7aa}
+.ins-namewarn-active .ins-clean-hdr span{color:#fdba74}
 
 .ins-dup{background:rgba(251,146,60,.07);border:1px solid rgba(251,146,60,.26);border-left:4px solid #fb923c}
 .ins-dup-hdr{display:flex;align-items:center;gap:12px}
@@ -178,12 +182,16 @@
 
     <!-- Archivo nuevo — listo para guardar -->
     <div id="st-clean" class="ins-panel ins-panel-col ins-clean" style="display:none">
-      <div class="ins-clean-hdr">
-        <div class="ins-clean-ico"><i class="fa-solid fa-circle-check"></i></div>
+      <div class="ins-clean-hdr" id="ins-clean-hdr">
+        <div class="ins-clean-ico" id="ins-clean-ico"><i class="fa-solid fa-circle-check"></i></div>
         <div>
-          <strong>Archivo nuevo. Listo para guardar.</strong>
-          <span>No se encontraron duplicados en el sistema.</span>
+          <strong id="ins-clean-title">Archivo nuevo. Listo para guardar.</strong>
+          <span id="ins-clean-sub">No se encontraron duplicados en el sistema.</span>
         </div>
+      </div>
+      <div id="ins-namewarn-note" class="ins-panel ins-panel-row ins-alerted" style="display:none;border-radius:12px;padding:12px 14px;margin:2px 0 0">
+        <div class="ins-alerted-ico" style="width:34px;height:34px;font-size:15px;flex-shrink:0"><i class="fa-solid fa-bell-concierge"></i></div>
+        <span style="color:#bfdbfe;font-size:13px">Ya existe un archivo llamado <strong id="ins-namewarn-nombre">—</strong> con contenido distinto. Si guarda, se agregará un sufijo (ej. <code>_1</code>) para no sobrescribirlo, y el administrador será <strong>notificado automáticamente</strong>.</span>
       </div>
       <div id="ins-prog-wrap" class="ins-prog-wrap" style="display:none">
         <div class="ins-prog-label">
@@ -228,6 +236,10 @@
           <strong id="ins-success-title">Memorando guardado correctamente</strong>
           <span id="ins-success-nom">—</span>
         </div>
+      </div>
+      <div id="ins-success-namewarn" class="ins-panel ins-panel-row ins-alerted" style="display:none;border-radius:12px;padding:12px 14px;margin-bottom:4px">
+        <div class="ins-alerted-ico" style="width:34px;height:34px;font-size:15px;flex-shrink:0"><i class="fa-solid fa-bell-concierge"></i></div>
+        <span style="color:#bfdbfe;font-size:13px">Se guardó con un nombre distinto al existente (mismo nombre, contenido diferente) — el administrador fue <strong>notificado automáticamente</strong>.</span>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button type="button" class="ins-btn ins-btn-outline ins-btn-sm" onclick="insReset()">
@@ -387,7 +399,20 @@ async function _procesar(f) {
       document.getElementById('dup-fecha').textContent   = data.fecha_subida   || '—';
       document.getElementById('dup-usuario').textContent = data.usuario        || '—';
       _setEstado('dup');
+    } else if(data.nombre_duplicado) {
+      document.getElementById('ins-clean-hdr').classList.add('ins-namewarn-active');
+      document.getElementById('ins-clean-ico').innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+      document.getElementById('ins-clean-title').textContent = 'Nombre ya existente, contenido distinto.';
+      document.getElementById('ins-clean-sub').textContent = 'Puede guardar igual: se agregará un sufijo para no sobrescribir el archivo existente.';
+      document.getElementById('ins-namewarn-nombre').textContent = data.nombre_existente || '—';
+      document.getElementById('ins-namewarn-note').style.display = 'flex';
+      _setEstado('clean');
     } else {
+      document.getElementById('ins-clean-hdr').classList.remove('ins-namewarn-active');
+      document.getElementById('ins-clean-ico').innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+      document.getElementById('ins-clean-title').textContent = 'Archivo nuevo. Listo para guardar.';
+      document.getElementById('ins-clean-sub').textContent = 'No se encontraron duplicados en el sistema.';
+      document.getElementById('ins-namewarn-note').style.display = 'none';
       _setEstado('clean');
     }
   } catch(e) {
@@ -429,6 +454,8 @@ window.insGuardar = async function() {
             document.getElementById('ins-success-nom').textContent = (d.nombre || _archivo.name) + pag;
             const tit = document.getElementById('ins-success-title');
             if(tit) tit.textContent = _tipo === 'reservado' ? 'Reservado guardado correctamente' : 'Memorando guardado correctamente';
+            const warnNote = document.getElementById('ins-success-namewarn');
+            if(warnNote) warnNote.style.display = d.nombre_duplicado ? 'flex' : 'none';
             resolve(d);
           } else { reject(new Error(d.detail || 'Error desconocido')); }
         } else if(xhr.status === 409) {
@@ -500,6 +527,13 @@ window.insReset = function() {
   const btn = document.getElementById('ins-btn-save');
   const lbl = _tipo === 'reservado' ? '<i class="fa-solid fa-lock"></i> Guardar reservado' : '<i class="fa-solid fa-floppy-disk"></i> Guardar memorando';
   if(btn) { btn.disabled = false; btn.innerHTML = lbl; }
+  document.getElementById('ins-clean-hdr').classList.remove('ins-namewarn-active');
+  document.getElementById('ins-clean-ico').innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+  document.getElementById('ins-clean-title').textContent = 'Archivo nuevo. Listo para guardar.';
+  document.getElementById('ins-clean-sub').textContent = 'No se encontraron duplicados en el sistema.';
+  document.getElementById('ins-namewarn-note').style.display = 'none';
+  const warnNote = document.getElementById('ins-success-namewarn');
+  if(warnNote) warnNote.style.display = 'none';
 };
 
 })();

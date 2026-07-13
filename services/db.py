@@ -164,6 +164,7 @@ def init_db() -> None:
         _add_column_if_missing(conn, "alertas_revision", "nombre_existente", "TEXT")
         _add_column_if_missing(conn, "reservados", "hash_sha256", "TEXT")
         _add_column_if_missing(conn, "reservados", "usuario_id", "INTEGER")
+        _add_column_if_missing(conn, "alertas_revision", "tipo", "TEXT NOT NULL DEFAULT 'hash'")
 
         conn.execute(
             """
